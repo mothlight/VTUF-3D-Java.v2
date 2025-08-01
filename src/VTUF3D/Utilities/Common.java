@@ -127,6 +127,19 @@ public class Common
 
 	}
 	
+	//this will split a csv line that some items in quotes and separated by commas
+	public static String[] splitCSVLineIncludingQuotes(String line)
+	{
+		String[] splitLine = line.split(",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)");
+		
+		for (int i=0;i<splitLine.length;i++)
+		{
+			splitLine[i] = splitLine[i].replaceAll("\"", "").trim();
+		}
+		
+		return splitLine;
+	}
+	
 	public void appendFile(String text, String filename)
 	{
 		BufferedWriter bw = null;

@@ -664,6 +664,8 @@ public class OverallConfiguration
 	    state.configPartitioningMethod=treemapNamelist.getIntValue("runSwitches", "partitioningMethod");
 	    state.usingDiffShading=treemapNamelist.getIntValue("runSwitches", "usingDiffShading");
 	    
+	    System.out.println(state.toString());
+	    
 //	    end subroutine readMaespaTreeMapFromConfig
 	    return state;
 	 }

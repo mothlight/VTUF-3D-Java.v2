@@ -631,6 +631,15 @@ public class TUFreg3D
 		overall.writeOutput(Constants.RadiationBalanceFacetsOut,
 				"lambdap,H/L,H/W,latitude,streetdir,julian_day,time_of_day,time(continuous),SKd,SKup,SLd,SLup,EKd,EKup,ELd,ELup,NKd,NKup,NLd,NLup,WKd,WKup,WLd,WLup,RfKd,RfKup,RfLd,RfLup,FKd,FKup,FLd,FLup"
 				,true);
+		
+		
+		//precalculate potential ETO for entire run
+		for (int i=0;i<numfrc;i++)
+		{
+			
+			
+			
+		}
 	
 //System.out.println("++++++++++++++++++++++++start loop=" + (System.currentTimeMillis() - startTime)/1000. );		
 		

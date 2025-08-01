@@ -2,7 +2,12 @@ package VTUF3D;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.TreeMap;
 
+import Simpel.ETo;
+import Simpel.SimpelConstants;
+import Simpel.SimpelModelTimestep;
 import VTUF3D.Utilities.Common;
 import VTUF3D.Utilities.MaespaDataFile;
 import VTUF3D.Utilities.Namelist;
@@ -46,6 +51,9 @@ public class VTUF3DLoop
 			boolean sum_out, boolean matlab_out, boolean writeTsfc, boolean writeKl, boolean writeKabs, boolean writeKrefl, boolean writeLabs, 
 			boolean writeLrefl, boolean writeLdown, boolean writeTmrt, boolean writeUtci, boolean writeEnergyBalances, double strorint, double xlatint, int badKdn, int year)
 	{
+		SimpelModelTimestep simpel = new SimpelModelTimestep();	
+		HashMap<Integer,TreeMap<Integer,Double>> allSimpelPreviousTimesteps = new HashMap<Integer,TreeMap<Integer,Double>>();
+		
 		int minres_bh;
 		int par_ab, numsfc_ab, numsfc2, jab;
 		double hwactual;
@@ -176,10 +184,14 @@ public class VTUF3DLoop
 		double[] refltl;
 		double[] reflps;
 		double[] reflpl;
-		double[] vf2;
-		double[] vf3;
-		int[] vf3j;
-		int[] vf2j;
+//		double[] vf2;
+		HashMap<Integer,Double> vf2;
+//		double[] vf3;
+		HashMap<Integer,Double> vf3;
+//		int[] vf3j;
+		HashMap<Integer,Integer> vf3j;
+//		int[] vf2j;
+		HashMap<Integer,Integer> vf2j;
 		double[][] vertex;
 		double[][] face;
 		double[] lambda_sfc;
@@ -1168,8 +1180,10 @@ public class VTUF3DLoop
 
 				System.out.println("------------------------------------------");
 	
-				vf2 = new double[numsfc * numsfc2];
-				vf2j = new int[numsfc*numsfc2];
+//				vf2 = new double[numsfc * numsfc2];
+				vf2 = new HashMap<Integer,Double>();
+//				vf2j = new int[numsfc*numsfc2];
+				vf2j = new HashMap<Integer,Integer>();
 
 				dx = new double[3];
 				vecti = new double[3];
@@ -1280,10 +1294,13 @@ System.out.println("++++++++++++++++++++++++start vfcalc=" + (System.currentTime
 						int iIndex11 = 0-1;//zero indexed arrays
 						for (int z = 0; z <= bh; z++)
 						{
+							System.out.println("starting loop z="+z + " of " + bh);
 							for (int y = b1; y <= b2; y++)
 							{
+								System.out.println("starting loop y="+y + " of " + b2);
 								for (int x = a1; x <= a2; x++)
 								{
+//									System.out.println("starting x="+x);
 									if (!surf[x][y][z][f])
 									{
 										// goto 41;
@@ -1629,8 +1646,10 @@ System.out.println("++++++++++++++++++++++++start vfcalc=" + (System.currentTime
 														// write(unit=n,rec=m)ind_ab(j),vf;
 														vftot5 = vftot5 + vf;
 														numvf = numvf + 1;
-														vf2[p] = vf;
-														vf2j[p] = ind_ab[j];
+//														vf2[p] = vf;
+														vf2.put(p,vf);
+//														vf2j[p] = ind_ab[j];
+														vf2j.put(p,ind_ab[j]) ;
 														p = p + 1;
 														m = m + 1;
 													}
@@ -1692,23 +1711,33 @@ System.out.println("++++++++++++++++++++++++start vfcalc=" + (System.currentTime
 				}
 
 				// Move this section outside of the if so that vf3 and vf3j scope remains for the later use
-				vf3 = new double[numvf];
-				vf3j = new int[numvf];
+//				vf3 = new double[numvf];
+				vf3 = new HashMap<Integer,Double>();
+//				vf3j = new int[numvf];
+				vf3j = new HashMap<Integer,Integer>();
 
 				//  arrays of view factors
 				for (int k = 0; k < numvf; k++)
 				{
-					vf3[k] = vf2[k];
-					vf3j[k] = vf2j[k];
+//					vf3[k] = vf2[k];
+					vf3.put(k,vf2.get(k));
+//					vf3j[k] = vf2j[k];
+					vf3j.put(k, vf2j.get(k));
 				}
+				
+				//don't need anymore, clear out memory
+				vf2 = null;
+				vf2j = null;
 
 				// ------------------------------------------------------------------
 
 				if (vfcalc == 0)
 				{
 
-					vf3 = new double[numvf];
-					vf3j = new int[numvf];
+//					vf3 = new double[numvf];
+					vf3 = new HashMap<Integer,Double>();
+//					vf3j = new int[numvf];
+					vf3j = new HashMap<Integer,Integer>();
 					// allocate(vf3(numvf));
 					// allocate(vf3j(numvf));
 					// vf3=0.;
@@ -1760,8 +1789,10 @@ System.out.println("++++++++++++++++++++++++start vfcalc=" + (System.currentTime
 						for (int q = vfipos[iabCount]; q < vfiend; q++)
 						{
 							// read(unit=vf1Dat,rec=q)j,vf;
-							vf3[p] = vf;
-							vf3j[p] = j;
+//							vf3[p] = vf;
+							vf3.put(p, vf);
+//							vf3j[p] = j;
+							vf3j.put(p, j);
 							vftot5 = vftot5 + vf;
 							p = p + 1;
 							if (vf > 1.0 || vf < 0.0)
@@ -2282,6 +2313,96 @@ if (Kbeam > 10000)
 								treeXYMapSunlightPercentageTotal = (double[][]) shadeReturn.get("treeXYMapSunlightPercentageTotal");
 //System.out.println("++++++++++++++++++++++++end Shade=" + (System.currentTimeMillis() - TUFreg3D.startTime)/1000./60. );	
 							}
+							
+							
+							
+							if ((timeis % outpt_tm) * 3600.0 < deltat && (int) (timeis * 100.) != timewrite)
+							{
+								System.out.println("after met at " + TM);
+								//TODO put soil module in here, to run each hour
+								
+								 // run Simpel for the timestep
+				        		HashMap<Integer,Double> simpelMetInput = new HashMap<Integer,Double>();
+//				        		String[] InputStr = new String[] {"20.1.2021.0","20","0","63.7493333333333","13.49","0.255833333333333","0","0"};
+				        		simpelMetInput.put(SimpelConstants.INPUT_P, 0.); //TODO, no precipitation in forcing data yet
+				        		simpelMetInput.put(SimpelConstants.INPUT_T14, Ta);
+				        								        		
+				        		double calcRH = common.CalculateRHFromVapor(Ta, ea);
+				        		
+				        		simpelMetInput.put(SimpelConstants.INPUT_R14, calcRH);		
+				        		simpelMetInput.put(SimpelConstants.INPUT_K_DOWN, Ktotfrc);
+				        								        	   
+				        		long month = Math.round(yd_actual/30.);//TODO set the actual month
+				        		simpelMetInput.put(SimpelConstants.INPUT_DOY, yd_actual*1.0);
+				        		simpelMetInput.put(SimpelConstants.INPUT_MONTH, month*1.0);
+				        		simpelMetInput.put(SimpelConstants.INPUT_HOUR, TM*1.0);
+				        		
+//				        		System.out.println("inputhour "+common.roundTwoDecimals(TM));
+				        		if (simpelMetInput.get(SimpelConstants.INPUT_HOUR) == 13) //TODO, set from property file, what time, how much irrigation
+				        		{
+				        			simpelMetInput.put(SimpelConstants.INPUT_IRR, 4.0);
+				        		}
+				        				
+				        		//TODO, for now just using a single iabCount
+				        		int iabCount = 0;
+				        		//ok if this is null for the first time, will be filled in the timestep function
+				        		TreeMap<Integer,Double> simpelPreviousTimestepValues = allSimpelPreviousTimesteps.get(iabCount);
+				        		
+				        		ETo eto = new ETo();						        		
+//				        		The latitude of the met station (dec deg) 
+				        		double lat=-37.5;
+//				        		The longitude of the met station (dec deg) (only needed if calculating ETo hourly)
+				        		double lon=145;
+//				        		The longitude of the center of the time zone (dec deg) (only needed if calculating ETo hourly).
+				        		double TZ_lon=145;
+//				        		Elevation of the met station above mean sea level (m) 
+				        		double z_msl=500;
+//				        		The height of the wind speed measurement (m). Default is 2 m.
+				        		double z_u=2;
+//				        		Wind speed at height z (m/s), set to NaN to calculate
+				        		double U_z=Double.NaN;
+//				        		Albedo. Should be 0.23 for the reference crop.
+				        		double alb = 0.23;
+//				        		Day of Year
+				        		int Day = yd_actual;		
+//				        		Time frequency string of the input and output. The minimum frequency is hours (H) and the maximum is month (M).
+				        		int freq=ETo.HOURLY;
+//				        		Time of day
+				        		int hour = (int) Math.round(TM);		
+//				        		Incoming shortwave radiation (MJ/m2)
+				        		double R_s_hourly = Ktotfrc * 60. * 60. * 1E-6;  
+//				        		Actual Vapour pressure derrived from RH
+				        		double e_a_hourly = ea;  
+//				        		Mean Temperature (deg C)
+				        		double T_mean_hourly = Ta;
+				        		// if no incoming shortwave, then nighttime
+				        		boolean daytime = true;
+				        		if (Ktotfrc < 50)
+				        		{
+				        			daytime = false;
+				        		}
+				        		
+				        		double Rnet_simpel = absbl[iabCount] + absbs[iabCount];
+				        		
+				        		double etoValue = eto.eto_fao_hourly(freq, lat, Day, lon, TZ_lon, z_msl, e_a_hourly, R_s_hourly, T_mean_hourly, z_u, U_z, alb, hour, daytime, Rnet_simpel);
+
+				        		double[][] simpelReturnValues = simpel.SIMPLE_function(simpelMetInput, SimpelConstants.Landuse, SimpelConstants.LAI_model, 
+				        														SimpelConstants.Soil, simpelPreviousTimestepValues, etoValue);    		
+				        		simpelPreviousTimestepValues = simpel.setPreviousValues(simpelReturnValues);
+				        		allSimpelPreviousTimesteps.put(iabCount,simpelPreviousTimestepValues);
+				        		
+				        		double simpelETA = simpelReturnValues[0][SimpelConstants.ETA_TOTAL];
+				        		double simpelQe = simpel.qeFromETA2(simpelETA);
+				        		System.out.println("             ++++++ eto "+ common.roundTwoDecimals(etoValue) + " " +  common.roundTwoDecimals(simpelETA )
+				        				+ " " + common.roundTwoDecimals(simpelQe)
+				        				+ " " + common.roundTwoDecimals(Ktotfrc)
+				        				+ " " + common.roundTwoDecimals(Rnet_simpel)) ;
+//				        		System.out.println("eto "+ common.roundTwoDecimals(etoValue) + " " +  common.roundTwoDecimals(simpelETA )+ " " + (simpelQe)) ;
+				        		
+//				        		simpelQe=0;	    						        		
+				        		// end Simpel	
+								
+							}
 
 							for (int iabCount = 0; iabCount < numsfc_ab; iabCount++)
 							{
@@ -2290,6 +2411,7 @@ if (Kbeam > 10000)
 								reflts[iabCount] = 0.;
 								refltl[iabCount] = 0.;
 							}
+														
 							//  CONTINUATION POINT FOR Tsfc-Lup balance iterations (below)--------
 							boolean tsfcLupBalanceContinue = true;
 							while (tsfcLupBalanceContinue)
@@ -2361,8 +2483,10 @@ if (Kbeam > 10000)
 											// do p=vfppos[iab],vfppos[iab+1]-1
 											for (int pCount = vfppos[iabCount]; pCount < vfppos[iabCount + 1]  ; pCount++)
 											{
-												vf = vf3[pCount];
-												jab = vf3j[pCount];
+//												vf = vf3[pCount];
+												vf = vf3.get(pCount);
+//												jab = vf3j[pCount];
+												jab = vf3j.get(pCount);
 												absbl[iabCount] = absbl[iabCount] + vf * reflpl[jab] * sfc[iIndex5][Constants.sfc_emiss];
 												if (absbl[iabCount] > 2000.)
 												{
@@ -2565,8 +2689,10 @@ if (Kbeam > 10000)
 											int iIndex8 = (int) sfc_ab[iabCount][Constants.sfc_ab_i];
 											for (int pCount = vfppos[iabCount]; pCount < vfppos[iabCount + 1] ; pCount++)
 											{
-												vf = vf3[pCount];
-												jab = vf3j[pCount];
+//												vf = vf3[pCount];
+												vf = vf3.get(pCount);
+//												jab = vf3j[pCount];
+												jab = vf3j.get(pCount);
 												absbs[iabCount] = absbs[iabCount] + vf * reflps[jab] * (1. - sfc[iIndex8][Constants.sfc_albedo]);
 //if (iabCount==0) System.out.println("absbs[iabCount]3 " + absbs[iabCount]);
 												refls[iabCount] = refls[iabCount] + vf * reflps[jab] * sfc[iIndex8][Constants.sfc_albedo];
@@ -3053,16 +3179,100 @@ if (Kbeam > 10000)
 											leFromEt5 = maespaDataArray.get(key).get(tempTimeis-1).getQeCalc5() ;
 										}
 									}
+									
+					               
 
 									if (treeXYTreeMap[sfc_ab_map_x[iabCount]-1][sfc_ab_map_y[iabCount]-1] > 0)
 									{
+//										 // run Simpel for the timestep
+//						        		HashMap<Integer,Double> simpelMetInput = new HashMap<Integer,Double>();
+////						        		String[] InputStr = new String[] {"20.1.2021.0","20","0","63.7493333333333","13.49","0.255833333333333","0","0"};
+//						        		simpelMetInput.put(SimpelConstants.INPUT_P, 0.); //TODO, no precipitation in forcing data yet
+//						        		simpelMetInput.put(SimpelConstants.INPUT_T14, Ta);
+//						        								        		
+//						        		double calcRH = common.CalculateRHFromVapor(Ta, ea);
+//						        		
+//						        		simpelMetInput.put(SimpelConstants.INPUT_R14, calcRH);		
+//						        		simpelMetInput.put(SimpelConstants.INPUT_K_DOWN, Ktotfrc);
+//						        								        	   
+//						        		long month = Math.round(yd_actual/30.);//TODO set the actual month
+//						        		simpelMetInput.put(SimpelConstants.INPUT_DOY, yd_actual*1.0);
+//						        		simpelMetInput.put(SimpelConstants.INPUT_MONTH, month*1.0);
+//						        		simpelMetInput.put(SimpelConstants.INPUT_HOUR, TM*1.0);
+//						        		
+////						        		System.out.println("inputhour "+common.roundTwoDecimals(TM));
+//						        		if (simpelMetInput.get(SimpelConstants.INPUT_HOUR) == 13) //TODO, set from property file, what time, how much irrigation
+//						        		{
+//						        			simpelMetInput.put(SimpelConstants.INPUT_IRR, 4.0);
+//						        		}
+//						        								        		
+//						        		//ok if this is null for the first time, will be filled in the timestep function
+//						        		TreeMap<Integer,Double> simpelPreviousTimestepValues = allSimpelPreviousTimesteps.get(iabCount);
+//						        		
+//						        		ETo eto = new ETo();						        		
+////						        		The latitude of the met station (dec deg) 
+//						        		double lat=-37.5;
+////						        		The longitude of the met station (dec deg) (only needed if calculating ETo hourly)
+//						        		double lon=145;
+////						        		The longitude of the center of the time zone (dec deg) (only needed if calculating ETo hourly).
+//						        		double TZ_lon=145;
+////						        		Elevation of the met station above mean sea level (m) 
+//						        		double z_msl=500;
+////						        		The height of the wind speed measurement (m). Default is 2 m.
+//						        		double z_u=2;
+////						        		Wind speed at height z (m/s), set to NaN to calculate
+//						        		double U_z=Double.NaN;
+////						        		Albedo. Should be 0.23 for the reference crop.
+//						        		double alb = 0.23;
+////						        		Day of Year
+//						        		int Day = yd_actual;		
+////						        		Time frequency string of the input and output. The minimum frequency is hours (H) and the maximum is month (M).
+//						        		int freq=ETo.HOURLY;
+////						        		Time of day
+//						        		int hour = (int) Math.round(TM);		
+////						        		Incoming shortwave radiation (MJ/m2)
+//						        		double R_s_hourly = Ktotfrc * 60. * 60. * 1E-6;  
+////						        		Actual Vapour pressure derrived from RH
+//						        		double e_a_hourly = ea;  
+////						        		Mean Temperature (deg C)
+//						        		double T_mean_hourly = Ta;
+//						        		// if no incoming shortwave, then nighttime
+//						        		boolean daytime = true;
+//						        		if (Ktotfrc < 50)
+//						        		{
+//						        			daytime = false;
+//						        		}
+//						        		
+//						        		double etoValue = eto.eto_fao_hourly(freq, lat, Day, lon, TZ_lon, z_msl, e_a_hourly, R_s_hourly, T_mean_hourly, z_u, U_z, alb, hour, daytime);
+//
+//						        		double[][] simpelReturnValues = simpel.SIMPLE_function(simpelMetInput, SimpelConstants.Landuse, SimpelConstants.LAI_model, 
+//						        														SimpelConstants.Soil, simpelPreviousTimestepValues, etoValue);    		
+//						        		simpelPreviousTimestepValues = simpel.setPreviousValues(simpelReturnValues);
+//						        		allSimpelPreviousTimesteps.put(iabCount,simpelPreviousTimestepValues);
+//						        		
+//						        		double simpelETA = simpelReturnValues[0][SimpelConstants.ETA_TOTAL];
+//						        		double simpelQe = simpel.qeFromETA2(simpelETA);
+//						        		System.out.println("eto "+ common.roundTwoDecimals(etoValue) + " " +  common.roundTwoDecimals(simpelETA )+ " " + common.roundTwoDecimals(simpelQe)) ;
+////						        		System.out.println("eto "+ common.roundTwoDecimals(etoValue) + " " +  common.roundTwoDecimals(simpelETA )+ " " + (simpelQe)) ;
+//						        		
+////						        		simpelQe=0;	    						        		
+//						        		// end Simpel	
+										
+						        		if ((sfc[iIndex10][Constants.sfc_z] - 0.5) * patchlen < zH - 0.01)
+										{
+//						        			System.out.println("canyon");
+//						        			System.out.println("simpel="+common.roundTwoDecimals(simpelQe) + " " + "maespa=" + common.roundTwoDecimals(leFromEt5));
+										}
+										
+										
+																		
 										// this rnet value would have been calculated using the vegetation alb/emis
 										currentRnet[iabCount] = Rnet - sfc[iIndex10][Constants.sfc_emiss] * sigma * Math.pow(Tsfc[iabCount], 4);
 
-										currentQh[iabCount] = (httc * (Tsfc[iabCount] - Tconv));
+										currentQh[iabCount] = (httc * (Tsfc[iabCount] - Tconv))- leFromEt5;
 										currentQe[iabCount] = leFromEt5;
 										currentQg[iabCount] = (Rnet - sfc[iIndex10][Constants.sfc_emiss] * sigma * Math.pow(Tsfc[iabCount], 4))
-												- (httc * (Tsfc[iabCount] - Tconv)) - leFromEt5;
+												- (httc * (Tsfc[iabCount] - Tconv)) ;
 
 										Rnet_tot = Rnet_tot + currentRnet[iabCount];
 										Qh_tot = Qh_tot + currentQh[iabCount];
@@ -3078,11 +3288,11 @@ if (Kbeam > 10000)
 										// this isn't a Maespa surface then, so use the normal TUF method
 									}
 									else
-									{
+									{											
 										currentRnet[iabCount] = Rnet - sfc[iIndex10][Constants.sfc_emiss] * sigma * Math.pow(Tsfc[iabCount], 4);
-
-										currentQh[iabCount] = (httc * (Tsfc[iabCount] - Tconv));
 										currentQe[iabCount] = leFromEt5;
+
+										currentQh[iabCount] = (httc * (Tsfc[iabCount] - Tconv));										
 										currentQg[iabCount] = (lambda_sfc[iabCount] * (Tsfc[iabCount] - sfc_ab[iabCount][Constants.sfc_ab_layer_temp]) * 2.
 												/ sfc_ab[iabCount][sixPlusThreeTimesNumlayers]);
 										Rnet_tot = Rnet_tot + currentRnet[iabCount];
@@ -3390,9 +3600,7 @@ if (Kbeam > 10000)
 							//  the forcing causes the canyon temperature to reverse trend
 							if (Math.abs(deltat * (Qhcan - Qhtop) / Cairavg - dTcan_old) > 0.05 && deltat > 2.)
 							{
-//System.out.println(   (deltat * (Qhcan - Qhtop) / Cairavg - dTcan_old)   
-//		+ " "  + (deltat * (Qhcan - Qhtop) / (Cairavg - dTcan_old))    
-//		+ " " + deltat + " "  + Qhcan + " " +  Qhtop + " " + Cairavg + " " +  dTcan_old);
+
 								timeis = timeis - deltat / 3600.;
 								deltat = deltat * 5. / 8.;
 								counter = 10;
@@ -3413,9 +3621,6 @@ if (Kbeam > 10000)
 							//  WRITE OUTPUT
 							if (frcwrite)
 							{
-//								System.out.println("FORCING=" + lpactual + " " + (2. * bh) / (1.0*bl + bw) + " " + hwactual + " " + stror + " "
-//												+ timeis + " " + Kdir + " " + Kdif + " " + Ldn + " " + Ta + " " + ea
-//												+ " " + Ua + " " + Udir + " " + press + " " + az + " " + zen);
 								overall.writeOutput(Constants.forcing_dat,
 										lpactual + " " + (2. * bh) / (1.0*bl + bw) + " " + hwactual + " " + stror + " "
 												+ timeis + " " + Kdir + " " + Kdif + " " + Ldn + " " + Ta + " " + ea
@@ -3556,7 +3761,7 @@ if (Kbeam > 10000)
 									|| ((timeis % outpt_tm) * 3600.0 < deltat && (int) (timeis * 100.) != timewrite)
 									|| last_write))
 							{
-System.out.println("++++++++++++++++++++++++start Matlab=" + (System.currentTimeMillis() - TUFreg3D.startTime)/1000./60. );	
+//System.out.println("++++++++++++++++++++++++start Matlab=" + (System.currentTimeMillis() - TUFreg3D.startTime)/1000./60. );	
 								ywrite = false;
 								timewrite = (int) (timeis * 100.);
 
@@ -3595,7 +3800,7 @@ System.out.println("++++++++++++++++++++++++start Matlab=" + (System.currentTime
 										+ Tsfc_R / (numroof2) + " " + Tsfc_T / (numstreet2) + " " + Tsfc_N / (numNwall2)
 										+ " " + Tsfc_S / (numSwall2) + " " + Tsfc_E / (numEwall2) + " "
 										+ Tsfc_W / (numWwall2));
-System.out.println("++++++++++++++++++++++++start writeOutput=" + (System.currentTimeMillis() - TUFreg3D.startTime)/1000./60. );		
+//System.out.println("++++++++++++++++++++++++start writeOutput=" + (System.currentTimeMillis() - TUFreg3D.startTime)/1000./60. );		
 								//  WRITE OUTPUT
 								overall.writeOutput(Constants.EnergyBalanceOverallOut, 
 										common.roundToDecimals(lpactual , 3) + "\t" + 
@@ -3938,7 +4143,7 @@ System.out.println("++++++++++++++++++++++++start writeOutput=" + (System.curren
 										}
 									}
 								}
-System.out.println("++++++++++++++++++++++++start outputresults=" + (System.currentTimeMillis() - TUFreg3D.startTime)/1000./60. );									
+//System.out.println("++++++++++++++++++++++++start outputresults=" + (System.currentTimeMillis() - TUFreg3D.startTime)/1000./60. );									
 								OutputResults outputresults = new OutputResults();
 								outputresults.outputMatlab(matlab_out, time_out, first_write, writeTsfc, writeKl, 
 										writeKabs, writeKrefl, writeLabs, writeLrefl, writeLdown, writeTmrt, 
@@ -3951,7 +4156,7 @@ System.out.println("++++++++++++++++++++++++start outputresults=" + (System.curr
 										zen, Acan, Bcan, Ccan, patchlen, currentRnet, 
 										currentQh, currentQe, currentQg, utci, 
 										maespaDataArray);		
-System.out.println("++++++++++++++++++++++++start outputUrbanPlumber=" + (System.currentTimeMillis() - TUFreg3D.startTime)/1000./60. );										
+//System.out.println("++++++++++++++++++++++++start outputUrbanPlumber=" + (System.currentTimeMillis() - TUFreg3D.startTime)/1000./60. );										
 								UrbanPlumberOutput outputUrbanPlumber = new UrbanPlumberOutput();
 								outputUrbanPlumber.output( time_out, first_write, overall,  
 										tots, totl, reflts, refltl, absbs, timeis, 
@@ -3960,7 +4165,7 @@ System.out.println("++++++++++++++++++++++++start outputUrbanPlumber=" + (System
 										Tsfc_R, Tsfc_T, Tsfc_N, Tsfc_S, Tsfc_E, Tsfc_W, 
 										numroof2, numstreet2, numNwall2, numSwall2, numEwall2, numWwall2,
 										Kdir, Kdif);	
-System.out.println("++++++++++++++++++++++++end outputUrbanPlumber=" + (System.currentTimeMillis() - TUFreg3D.startTime)/1000./60. );		
+//System.out.println("++++++++++++++++++++++++end outputUrbanPlumber=" + (System.currentTimeMillis() - TUFreg3D.startTime)/1000./60. );		
 								first_write = false;
 								//  whether or not it is a timestep to write outputs
 							}
