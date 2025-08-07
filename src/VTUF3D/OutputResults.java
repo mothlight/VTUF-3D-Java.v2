@@ -630,7 +630,168 @@ public class OutputResults
 //		}
 //	}
 	
+	public void writeInputs(OverallConfiguration overall, int vfcalc, int yd, double deltat, double outpt_tm, double Tthreshold,
+			boolean facet_out, boolean matlab_out, boolean sum_out, double dalb,
+			double albr, double albs, double albw, double emisr, double emiss, double emisw, int cloudtype,
+			double IntCond, double Intresist, double uc, int numlayers,
+			double[] thickr, double[] lambdar, double[] htcapr,
+			double[] thicks, double[] lambdas, double[] htcaps,
+			double[] thickw, double[] lambdaw, double[] htcapw,
+			double z0, double lambdaf, double zrooffrc,
+			double z0roofm, double z0roadm, double z0roofh, double z0roadh, double moh, double rw,
+			double buildht_m, double zref, int minres,
+			double Tsfcr, double Tsfcs, double Tsfcw, double Tintw, double Tints, double Tfloor, double Tbuild_min,
+			double stror_in, double strorint, double strormax,
+			double xlat_in, double xlatint, double  xlatmax, int numlp, double[] lpin, int numbhbl, double[] bh_o_bl)
+	{
+		// ! write to output file that records the inputs
+		// ! model/integration parameters
+		overall.writeOutput(Constants.inputs_store_out, "vfcalc,yd,deltat,outpt_tm,Tthreshold",true);
+		overall.writeOutput(Constants.inputs_store_out,
+				vfcalc + " " + yd + " " + deltat + " " + outpt_tm + " " + Tthreshold);
+		overall.writeOutput(Constants.inputs_store_out, "facet_out,matlab_out,sum_out");
+		overall.writeOutput(Constants.inputs_store_out, facet_out + " " + matlab_out + " " + sum_out);
 	
+		// ! radiative parameters
+		overall.writeOutput(Constants.inputs_store_out, "dalb");
+		overall.writeOutput(Constants.inputs_store_out, dalb + "");
+		overall.writeOutput(Constants.inputs_store_out, "albr,albs,albw,emisr,emiss,emisw");
+		overall.writeOutput(Constants.inputs_store_out,
+				albr + " " + albs + " " + albw + " " + emisr + " " + emiss + " " + emisw);
+		overall.writeOutput(Constants.inputs_store_out, "cloudtype");
+		overall.writeOutput(Constants.inputs_store_out, cloudtype + "");
+
+		// ! conduction parameters
+		overall.writeOutput(Constants.inputs_store_out, "IntCond,Intresist,uc,numlayers");
+		overall.writeOutput(Constants.inputs_store_out, IntCond + " " + Intresist + " " + uc + " " + numlayers);
+		overall.writeOutput(Constants.inputs_store_out, "thickr(k),lambdar(k),htcapr(k)");
+		for (int k = 0; k < numlayers; k++)
+		{
+			overall.writeOutput(Constants.inputs_store_out, thickr[k] + " " + lambdar[k] + " " + htcapr[k]);
+		}
+		overall.writeOutput(Constants.inputs_store_out, "thicks(k),lambdas(k),htcaps(k)");
+		for (int k = 0; k < numlayers; k++)
+		{
+			overall.writeOutput(Constants.inputs_store_out, thicks[k] + " " + lambdas[k] + " " + htcaps[k]);
+		}
+		overall.writeOutput(Constants.inputs_store_out, "thickw(k),lambdaw(k),htcapw(k)");
+		for (int k = 0; k < numlayers; k++)
+		{
+			overall.writeOutput(Constants.inputs_store_out, thickw[k] + " " + lambdaw[k] + " " + lambdaw[k]);
+		}
+
+		// ! convection parameters
+		overall.writeOutput(Constants.inputs_store_out, "z0,lambdaf,zrooffrc");
+		overall.writeOutput(Constants.inputs_store_out, z0 + " " + lambdaf + " " + zrooffrc);
+		overall.writeOutput(Constants.inputs_store_out, "z0roofm,z0roadm,z0roofh,z0roadh,moh,rw");
+		overall.writeOutput(Constants.inputs_store_out,
+				z0roofm + " " + z0roadm + " " + z0roofh + " " + z0roadh + " " + moh + " " + rw);
+
+		// ! domain geometry
+		overall.writeOutput(Constants.inputs_store_out, "buildht_m,zref,minres");
+		overall.writeOutput(Constants.inputs_store_out, buildht_m + " " + zref + " " + minres);
+
+		// ! initial temperatures
+		overall.writeOutput(Constants.inputs_store_out, "Tsfcr,Tsfcs,Tsfcw,Tintw,Tints,Tfloor,Tbuild_min");
+		overall.writeOutput(Constants.inputs_store_out,
+				Tsfcr + " " + Tsfcs + " " + Tsfcw + " " + Tintw + " " + Tints + " " + Tfloor + " " + Tbuild_min);
+
+		// ! loop parameters
+		overall.writeOutput(Constants.inputs_store_out, "stror_in,strorint,strormax");
+		overall.writeOutput(Constants.inputs_store_out, stror_in + " " + strorint + " " + strormax);
+		overall.writeOutput(Constants.inputs_store_out, "xlat_in,xlatint,xlatmax");
+		overall.writeOutput(Constants.inputs_store_out, xlat_in + " " + xlatint + " " + xlatmax);
+		overall.writeOutput(Constants.inputs_store_out, "numlp");
+		overall.writeOutput(Constants.inputs_store_out, numlp + "");
+		overall.writeOutput(Constants.inputs_store_out, "lpin(k)");
+		for (int k = 0; k < numlp; k++)
+		{
+			overall.writeOutput(Constants.inputs_store_out, lpin[k] + "");
+		}
+		overall.writeOutput(Constants.inputs_store_out, "bh_o_bl(k)");
+		for (int l = 0; l < numbhbl; l++)
+		{
+			overall.writeOutput(Constants.inputs_store_out, bh_o_bl[l] + "");
+		}
+
+	}
+	
+	public void openOutputFiles(OverallConfiguration overall, int numfrc, double starttime, double deltatfrc, boolean calclf, boolean frcwrite)
+	{
+
+		overall.writeOutput(Constants.inputs_store_out, "numfrc,starttime,deltatfrc");
+		overall.writeOutput(Constants.inputs_store_out, numfrc + " " + starttime + " " + deltatfrc);
+	
+
+
+		// ! OPEN OUTPUT FILES
+	
+		overall.writeOutput(Constants.FLUXES_OUT,
+				"veg,i,timeis,maespaRnet,Rnet,sfc(i_Constants.sfc_emiss)*sigma*Math.pow(Tsfc[iab],4),(httc*(Tsfc[iab]-Tconv)),maespaQh,leFromEt,(lambda_sfc[iab]*(Tsfc[iab]-sfc_ab(iab_sfc_ab_layer_temp))*2./sfc_ab(iab_6+3*numlayers)),maespaQg,maespaAbsorbedThermal,QGBiomass,Tsfc,Tconv,httc,sfc_emis,MaespaRnetGround,deltaQVeg,absbl[iab],absbs[iab],tots[iab],totl[iab],reflts[iab],refltl[iab],kup,lup,kdn_grid,kdir,kdif,ktotfrc,kbeam,ldn,leFromEt2,leFromEt4"
+				,true);
+		overall.writeOutput(Constants.energybalancetsfctimeaverage_out,
+				"lambdap,H/L,H/W,latitude,streetdir,julian_day,time_of_day(centre),time(continuous&centre),time_of_day(end),time(continuous&end),Kuptot_avg,Luptot_avg,Rntot_avg,Qhtot_avg,Qgtot_avg,Qanthro_avg,Qac_avg,Qdeep_avg,Qtau,TR_avg,TT_avg,TN_avg,TS_avg,TE_avg,TW_avg"
+				,true);
+		overall.writeOutput(Constants.tsfcfacetssunshade_out,
+				"lambdap,H/L,H/W,latitude,streetdir,julian_day,time_of_day,time(continuous),TTsun,TTsh,TNsun,TNsh,TSsun,TSsh,TEsun,TEsh,TWsun,TWsh"
+				,true);
+		overall.writeOutput(Constants.tsfcfacets_out,
+				"lambdap,H/L,H/W,latitude,streetdir,julian_day,time_of_day,time(continuous),Tcomplete,Tbirdeye,Troof,Troad,Tnorth,Tsouth,Teast,Twest,Tcan,Ta,Tint,httcR,httcT,httcW,TbrightR,TbrightT,TbrightN,TbrightS,TbrightE,TbrightW"
+				,true);
+		overall.writeOutput(Constants.energybalancefacets_out,
+				"lambdap,H/L,H/W,latitude,streetdir,julian_day,time_of_day,time(continuous),QR,HR,GR,QT,HT,GT,QN,HN,GN,QS,HS,GS,QE,HE,GE,QW,HW,GW",
+				true);
+		overall.writeOutput(Constants.EnergyBalanceOverallOut,
+				"lambdap,H/L,H/W,latitude,streetdir,julian_day,time_of_day,time(continuous),Rnet_tot,Qh_SumSfc,Qh_Vol,Qg_SumSfc,Qg_SfcCanAir,Rnet_can,Qh_CanTop,Qh_SumCanSfc,Qg_Can_CanAir,Ucan,Utop,Uroad,wstar,Kdn,Kup,Ldn,Lup,Kdir_Calc,Kdif_Calc,Kdir,Kdif,Kup_can,Lup_can,az,zen,Kdn(NoAtm),Kdn_grid,Qe_tot"
+				,true);
+	
+		if (frcwrite)
+		{
+			overall.writeOutput(Constants.forcing_out,
+					"lambdap,H/L,H/W,latitude,streetdir,time,Kdir,Kdif,Ldn,Ta,ea,Ua,Udir,Press,az,zen"
+					,true);
+		}
+		overall.writeOutput(Constants.RadiationBalanceFacetsOut,
+				"lambdap,H/L,H/W,latitude,streetdir,julian_day,time_of_day,time(continuous),SKd,SKup,SLd,SLup,EKd,EKup,ELd,ELup,NKd,NKup,NLd,NLup,WKd,WKup,WLd,WLup,RfKd,RfKup,RfLd,RfLup,FKd,FKup,FLd,FLup"
+				,true);
+	}
+	
+	public void outputFacetOut(boolean facet_out, OverallConfiguration overall, double xlat, double stror, double patchlen, int yd, double[] lpin, double[] bh_o_bl,
+			int lpiter, int bhiter)
+	{
+		String latwrite2;
+	//  write out intra-facet (patch) surface temperatures
+		if (facet_out)
+		{
+			int lptowrite = (int) Math.round(lpin[lpiter] * 100.);
+			String lpwrite = common.padLeft(lptowrite, 3, '0') ;
+
+			int bhbltowrite = (int) Math.round(bh_o_bl[bhiter] * 100.); 
+			String bhblwrite = common.padLeft(bhbltowrite, 3, '0') ;
+
+			String strorwrite = common.padLeft((int) Math.round(stror), 2, '0') ;
+
+			String latwrite = common.padLeft( (int) Math.round(Math.abs(xlat)), 2, '0') ;
+
+			if (xlat >= 0.)
+			{
+				latwrite2 = latwrite + "N";
+			}
+			else
+			{
+				latwrite2 = latwrite + "S";
+			}
+			String ydwrite = common.padLeft( yd, 3, '0') ;
+
+			String TsfcSolarSVF_Patch_yd = "TsfcSolarSVF_Patch_yd" + ydwrite + "_lp" + lpwrite + "_bhbl"
+					+ bhblwrite + "_lat" + latwrite2 + "_stror" + strorwrite + ".out";
+			overall.writeOutput(TsfcSolarSVF_Patch_yd,
+					"patch direction is patch normal: 1=upwards, 2=north,3=east, 4=south, 5=west (these are the directionsprior to domain rotation (stror>0)",true);
+			overall.writeOutput(TsfcSolarSVF_Patch_yd, "patch_length(m)=" + " " + patchlen);
+			overall.writeOutput(TsfcSolarSVF_Patch_yd,
+					"time(h),patch_direction,z,y,x,SkyViewFactor,Tsurface(degC),Tbrightness(degC),Kabsorbed(W/m2),Kreflected(W/m2)");
+		}
+	}
 	
 	
 	public void outputMatlab(boolean matlab_out, int time_out, boolean first_write, boolean writeTsfc, boolean writeKl, 

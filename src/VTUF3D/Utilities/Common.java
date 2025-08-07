@@ -140,6 +140,21 @@ public class Common
 		return splitLine;
 	}
 	
+	public Date getCurrentSimulationDate(int year, int yd, double timeis)
+	{
+		// 1 hour = 3600000 milliseconds
+		long hourMillisecond = 3600000;
+		Calendar currentSimulationTimeCal = Calendar.getInstance();			
+		currentSimulationTimeCal.set(year, 0, 0, 0, 0, 0);
+		int dayOfYear = (int) Math.round(yd);
+		currentSimulationTimeCal.set(Calendar.DAY_OF_YEAR, dayOfYear);
+		long currentSimulationTimeStart = currentSimulationTimeCal.getTimeInMillis();
+		double currentOffset = timeis * hourMillisecond;
+		double currentOffsetTimeMillis = currentSimulationTimeStart+currentOffset;		
+		Date date = new Date(Math.round(currentOffsetTimeMillis));
+		return date;
+	}
+	
 	public void appendFile(String text, String filename)
 	{
 		BufferedWriter bw = null;
