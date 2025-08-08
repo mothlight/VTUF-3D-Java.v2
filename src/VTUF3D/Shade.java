@@ -9,44 +9,30 @@ public class Shade
 
 	// ! ----------------------------------------------------------
 	// ! Subroutine to determine which patches are shaded and which are sunlit
-	public static HashMap shade(double stror, double az, double RALT, double ypos, boolean[][][][] surf,
+	public static HashMap<String,double[][]> shade(double stror, double az, double RALT, boolean[][][][] surf,
 			boolean[][][] surf_shade, int AL2, int AW2, int BH, int PAR, double[][] sfc, int numsfc, int a1, int a2,
 			int b1, int b2, int numsfc2, double[][] sfc_ab, int par_ab, boolean[][][] veg_shade, double timeis,
 			int yd_actual, double[][] treeXYMapSunlightPercentageTotal, int[][] treeXYMap,
 			HashMap<String, MaespaDataFile> maespaTestflxData)
 	{
-		HashMap returnValues = new HashMap();
+		HashMap<String,double[][]> returnValues = new HashMap<String,double[][]>();
 		
 		boolean DEBUG_MODE = false;
-		int XTEST, YTEST, ZTEST;
-//		double xpos;
-		double DIR1, DIR2;
 		double xpinc, ypinc;
-		double XT, YT, ZT, XINC, YINC, ZINC;
-		boolean vegetationInRay;
 		// ! FOR PARAMETER 2 THE ELEMENT IS SUNLIT SURF(X,Y,Z,f,2)=1 OR SHADED SURF (X,Y,Z,f,2)=2
-		double ANGDIF, HH;
-		int i = 0, is;
-		int iab;
-//		double dmin;
+		int i = 0;
 		double[] sor = new double[6];
 		double[] sorsh = new double[6];
 		double transmissionPercentage;
-		double sorTmpValue;
-
-		// X=0;
-		// Y=0;
-		// Z=0;
-		vegetationInRay = false;
+		boolean vegetationInRay = false;
 		az = (az % 360.);
 		// ! ensure that stror is a positive angle between 0 and 360
 		stror = (stror + 360. % 360.);
 		// ! xpos and ypos are the orientations of the x and y axes
-		ypos = stror;
-//		xpos = stror + 90;
+		double ypos = stror;
 		// ! DECIDE WHETHER WALL ORIENTATION IS FACING THE SUN OR AWAY FROM IT
-		DIR1 = (az + 90. % 360.);
-		DIR2 = (az + 270. % 360.);
+		double DIR1 = (az + 90. % 360.);
+		double DIR2 = (az + 270. % 360.);
 		// ! set a minimum distance for ray to go before it can hit
 		// ! an obstacle (just longer than the distance from the center
 		// ! of a cell face to an opposite corner (1.225) to prevent
@@ -60,7 +46,7 @@ public class Shade
 		sor[4] = (stror + 180. % 360.);
 		sor[5] = (stror + 270. % 360.);
 		// ! only a maximum of two of these orientations can be shaded
-		is = 0;
+		int is = 0;
 		if ((DIR1 + 180) < 360)
 		{
 			for (int k = 2 ; k < 5+1; k++)
@@ -90,19 +76,19 @@ public class Shade
 		// ! SETUP NECESSARY EQUATIONS TO CALCULATE THE XINC,YINC AND ZINC(INCREMENTS REQUIRED FOR TESTING SUNLIT OR SHADED)
 	
 		// ! ANGDIF is the difference between the solar azimuth and the direction of the 'north' facing street
-		ANGDIF = az - ypos;
+		double ANGDIF = az - ypos;
 		if (ANGDIF < 0.)
 		{
 			ANGDIF = az + (360. - ypos);
 		}
-		HH = Math.cos(Math.toRadians(RALT)) * 0.2;
-		XINC = Math.sin(Math.toRadians(ANGDIF)) * HH;
-		YINC = Math.cos(Math.toRadians(ANGDIF)) * HH;
-		ZINC = Math.sin(Math.toRadians(RALT)) * 0.2;
+		double HH = Math.cos(Math.toRadians(RALT)) * 0.2;
+		double XINC = Math.sin(Math.toRadians(ANGDIF)) * HH;
+		double YINC = Math.cos(Math.toRadians(ANGDIF)) * HH;
+		double ZINC = Math.sin(Math.toRadians(RALT)) * 0.2;
 		// ! RUN THROUGH THE ARRAY TO DETERMINE WHICH FACES ARE SHADED AND SUNLIT
 		// ! IF FACING SUN DECIDE WHETHER LOCATION IS BLOCKED BY OTHER BUILDINGS
 		// ! ROOF IS not ALWAYS SUNLIT
-		iab = 0;
+		int iab = 0;
 		for (int f = TUFreg3D.ONE; f <=TUFreg3D.FIVE; f++) // !! KN switching this to 2,5 from 1,5 since sor(2:5)
 		{
 			for (int z = 0; z < BH ; z++)
@@ -111,6 +97,7 @@ public class Shade
 				{
 					for (int x = a1; x <= a2; x++)
 					{
+						double sorTmpValue;
 						if (!surf[x][y][z][f])
 						{
 							// ! if the cell face is not a surface:
@@ -173,9 +160,9 @@ public class Shade
 								{
 									ypinc = 0.25;
 								}
-								ZT = ((z) + ZINC);
-								XT = ((x) + XINC);
-								YT = ((y) + YINC);
+								double ZT = ((z) + ZINC);
+								double XT = ((x) + XINC);
+								double YT = ((y) + YINC);
 								// ! start the ray tracing from the wall element surface
 								// ! ACTUALLY from the center of four smaller patches that the
 								// ! original patch is subdivided into
@@ -213,9 +200,9 @@ public class Shade
 								{
 									System.out.println("PROBLEM with wall orientation");
 								}
-								ZTEST = (int) Math.round(ZT);
-								XTEST = (int) Math.round(XT);
-								YTEST = (int) Math.round(YT);
+								int ZTEST = (int) Math.round(ZT);
+								int XTEST = (int) Math.round(XT);
+								int YTEST = (int) Math.round(YT);
 								while ((XTEST == x) && (YTEST == y) && (ZTEST == z))
 								{
 									ZT = (ZT + ZINC);
@@ -231,7 +218,6 @@ public class Shade
 								}
 								while ((ZTEST <= BH) && (XTEST >= 1) && (XTEST <= AL2) && (YTEST >= 1) && (YTEST <= AW2) && (ZTEST >= 0))
 								{
-//System.out.println("ztest" + " " + ZTEST + " " + YTEST + " " + XTEST + " " + BH + " " + AL2 + " " + AW2 );
 									if (surf_shade[XTEST][YTEST][ZTEST])
 									{
 										// !! ray trace encounters a building,
@@ -297,7 +283,6 @@ public class Shade
 		returnValues.put("sfc", sfc);
 		returnValues.put("sfc_ab", sfc_ab);
 		returnValues.put("treeXYMapSunlightPercentageTotal", treeXYMapSunlightPercentageTotal);
-		//return sfc,sfc_ab,treeXYMapSunlightPercentageTotal;
 		return returnValues;
 	}
 }

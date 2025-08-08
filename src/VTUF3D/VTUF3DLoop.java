@@ -1,61 +1,80 @@
 package VTUF3D;
 
 import java.util.ArrayList;
-//import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
-//import java.util.HashSet;
 import java.util.TreeMap;
 
-//import Simpel.ETo;
 import Simpel.SimpelConstants;
-//import Simpel.SimpelModelTimestep;
 import Simpel.SimpelSurface;
 import VTUF3D.Utilities.Common;
 import VTUF3D.Utilities.MaespaDataFile;
 import VTUF3D.Utilities.Namelist;
 
 public class VTUF3DLoop
-{
-//	//to shift one indexed arrays to zero
-//	public final static int ONE = 0;
-//	public final static int TWO = 1;
-//	public final static int THREE = 2;
-//	public final static int FOUR = 3;
-//	public final static int FIVE = 4;
-//	public final static int SIX = 5;
-	
+{	
 	Common common = new Common();
 	Output output = new Output();
 	EnergyBalances energyBalances = new EnergyBalances();
 	OutputResults outputResults = new OutputResults();
-
-
-	public static void main(String[] args)
-	{
-		
-	}
+	VTUF3DUtil util = new VTUF3DUtil();
 	
-	public void loop(int numlp, int numbhbl, int minres, int vfcalc, double[] lpin, MaespaConfigTreeMapState treeMapFromConfig, double buildht_m, 
-			double zref, OverallConfiguration overall, int numlayers, 
-			double[] htcapr, double[] htcaps, double[] htcapw, 
-			double uc, VTUF3DUtil util, HashMap<String, HashMap<String, Namelist>> namelists, int[][] treeXYMap, 
-			double z0roofh, double z0roofm, double z0roadh, double z0roadm, double moh, 
-			double albs, double emiss, int[][] treeXYTreeMap, double albr, double emisr, double albw, double emisw, 
-			double lambdaf, boolean calcz0, double z0, double xlat_in, double xlatmax, double stror_in, double strormax, boolean facet_out, 
-			double[] bh_o_bl,
-			int yd, double outpt_tm, 
-			double[] thick, double IntCond, 
-			double Ldn_fact, int cloudtype, double[][] treeXYMapSunlightPercentageTotal, 
-			HashMap<String, MaespaDataFile> maespaTestflxData, 
-			double dalb, double rw, double zrooffrc, 
-			int DIFFERENTIALSHADINGDIFFUSE, HashMap<String, ArrayList<MaespaDataResults>> maespaDataArray, 
-			double Tthreshold, double[] tlayerp, double[] htcap, 
+	public void loop(int numlp, int numbhbl, int vfcalc, double[] lpin, MaespaConfigTreeMapState treeMapFromConfig, 
+			OverallConfiguration overall, HashMap<String, HashMap<String, Namelist>> namelists, int[][] treeXYMap,			
+			int[][] treeXYTreeMap,  double xlat_in, double xlatmax, double stror_in, double strormax, boolean facet_out, 
+			double[] bh_o_bl, int yd, double outpt_tm, double Ldn_fact, double[][] treeXYMapSunlightPercentageTotal, 
+			HashMap<String, MaespaDataFile> maespaTestflxData, 			
+			int DIFFERENTIALSHADINGDIFFUSE, HashMap<String, ArrayList<MaespaDataResults>> maespaDataArray,  double Tthreshold, 
 			boolean sum_out, boolean matlab_out, boolean writeTsfc, boolean writeKl, boolean writeKabs, boolean writeKrefl, boolean writeLabs, 
 			boolean writeLrefl, boolean writeLdown, boolean writeTmrt, boolean writeUtci, boolean writeEnergyBalances, double strorint, double xlatint, int year, 
 			int restartedRunStartTimestep, String rootDirectory, ParametersDat parameters)
 	{
+		// ! conduction parameters
+		double IntCond = parameters.IntCond;
+//		double Intresist = parameters.Intresist;
+		double uc = parameters.uc;
+		int numlayers = parameters.numlayers;
+		
+		double[] htcap = new double[numlayers];
+		double[] thick = new double[numlayers];
+		double[] tlayerp = new double[numlayers];
+		double[] htcapr = parameters.htcapr;
+		double[] htcaps = parameters.htcaps;
+		double[] htcapw = parameters.htcapw;
 
+		
+		// ! domain geometry
+		//this is obsolete now, calculated from the domains later on now
+		double buildht_m = parameters.buildht_m;
+		double zref = parameters.zref;
+		int minres = parameters.minres;
+		
+		// ! convection parameters
+		double z0 = parameters.z0;
+		double lambdaf = parameters.lambdaf;
+		double zrooffrc = parameters.zrooffrc;
+		double z0roofm = parameters.z0roofm;
+		double z0roadm = parameters.z0roadm;
+		double z0roofh = parameters.z0roofh;
+		double z0roadh = parameters.z0roadh;
+		double moh = parameters.moh;
+		double rw = parameters.rw;
+		boolean calcz0 = false;
+		if (z0 < 0.)
+		{
+			calcz0 = true;
+		}
+
+		// ! radiative parameters
+		double dalb = parameters.dalb;
+		double albr = parameters.albr;
+		double albs = parameters.albs;
+		double albw = parameters.albw;
+		double emisr = parameters.emisr;
+		double emiss = parameters.emiss;
+		double emisw = parameters.emisw;
+		int cloudtype = parameters.cloudtype;
+		
 		// ! initial temperatures
 		double TsfcrC = parameters.Tsfcr;
 		double TsfcsC = parameters.Tsfcs;
@@ -122,10 +141,6 @@ public class VTUF3DLoop
 		// !!KN, initializing it because it gets used below before any value is set
 		double zH = 0; 
 		
-		// !print *,'Ldn,Ldn_fact,calcKdn,calcLdn',Ldn,Ldn_fact,calcKdn,calcLdn
-		// ! assume initial Tcan!!!
-//		double Tcan = Ta + 0.5;
-
 		double timeis = starttime;
 		double timeend = starttime + deltatfrc * (1.0*numfrc-1);
 		double dta_timeend = timeend;
@@ -134,45 +149,57 @@ public class VTUF3DLoop
 		int numout = (int) ((timeend - starttime) / outpt_tm) + 1;
 		
 		double httc=0;
-//		int numsfc_ab;
-		int numsfc2, jab;
+		int numsfc2;
 		int timewrite = 0;
-//		int numtrees2 = 0;
-//		int numtreetops2 = 0;
 		boolean ywrite = false;
-		int nKgrid;
-		int timefrc_index;
 		int numTsun = 0, numTsh = 0, numNsun = 0, numNsh = 0, numSsun = 0, numSsh = 0, numEsun = 0;
-		int numEsh = 0, numWsun = 0, numWsh = 0;
+		int numEsh = 0, numWsun = 0;
+		int numWsh = 0;
 		int bl, bw, sw;
-		double stror;
-		double ypos = 0, Kdir = 0;
-		double solarin, vfsum2;
+		double Kdir = 0;
 		double Lup_refl_old;
-		double Lemit5;
 		double Kup_refl;
 		double Kup_refl_old;
 		double Ktot = 0;
 		double abs_aero = 0;
-		double angdif;
-		double Kbeam;
-//		double Qhcan;
 		double Udirdom;
 		double rhoa = 0;
-//		double rhocan = 0;
-//		double Cairavg;
-//		double Tsfc_R;
-		double cdtown, Fm = 0, ustar = 0, Qhcan_kin, wstar = 0;
+		double Fm = 0;
+		double ustar = 0;
+		double wstar = 0;
 		double Ccan = 0;
-		double Bcan = 0, Acan = 0, zzz, Ucantst;
-		double Qh_tot = 0, Rnet_tot = 0, Tsfc_cplt = 0;
-		double Tsfc_bird = 0, Tsfc_N = 0, Tsfc_S = 0, Tsfc_E = 0, Tsfc_W = 0, Tsfc_T = 0, zwall;
-		double rhohorz = 0, Rnet, Qg_tot = 0;
-		double Tconv;
-		double Tnew, Told, Fold, Fold_prime, Tdiffmax, Qhtop;
+		double Bcan = 0;
+		double Acan = 0;
+		double Qh_tot = 0;
+		double Rnet_tot = 0;
+		double Tsfc_cplt = 0;
+		double Tsfc_bird = 0;
+		double Tsfc_N = 0;
+		double Tsfc_S = 0;
+		double Tsfc_E = 0;
+		double Tsfc_W = 0;
+		double Tsfc_T = 0;
+		double rhohorz = 0;
+		double Qg_tot = 0;
 		double Qhcantmp = 0;
-		double Rnet_R = 0, Qh_R = 0, Qg_R = 0, Rnet_T = 0, Qh_T = 0, Qg_T = 0, Rnet_N = 0, Qh_N = 0, Qg_N = 0;
-		double Rnet_S = 0, Qh_S = 0, Qg_S = 0, Rnet_E = 0, Qh_E = 0, Qg_E = 0, Rnet_W = 0, Qh_W = 0, Qg_W = 0;		
+		double Rnet_R = 0;
+		double Qh_R = 0;
+		double Qg_R = 0;
+		double Rnet_T = 0;
+		double Qh_T = 0;
+		double Qg_T = 0;
+		double Rnet_N = 0;
+		double Qh_N = 0;
+		double Qg_N = 0;
+		double Rnet_S = 0;
+		double Qh_S = 0;
+		double Qg_S = 0;
+		double Rnet_E = 0;
+		double Qh_E = 0;
+		double Qg_E = 0;
+		double Rnet_W = 0;
+		double Qh_W = 0;
+		double  Qg_W = 0;		
 		double Qe_tot = 0;
 		double Qetot_avg = 0;
 		double leFromEt5;
@@ -181,26 +208,26 @@ public class VTUF3DLoop
 		double Kdn_R = 0, Kup_R = 0, Ldn_R = 0, Lup_R = 0, Kdn_T = 0, Kup_T = 0, Ldn_T = 0, Lup_T = 0;
 		double Kdn_N = 0, Kup_N = 0, Ldn_N = 0, Lup_N = 0, Kdn_S = 0, Kup_S = 0, Ldn_S = 0, Lup_S = 0;
 		double Kdn_E = 0, Kup_E = 0, Ldn_E = 0, Lup_E = 0, Kdn_W = 0, Kup_W = 0, Ldn_W = 0, Lup_W = 0;
-//		double thick_totr, thick_tots, thick_totw;
-		double Emit_W, Absbl_W;
-		double Absbs_W;
-		double Qh_abovezH = 0, httcR = 0, httcW = 0, httcT = 0;
+		double Qh_abovezH = 0, httcR = 0, httcW = 0;
+		double httcT = 0;
 		double Qanthro = 0, Qanthro_avg = 0, Qtau_avg = 0, Qac = 0, Qac_avg = 0, Qdeep = 0, Qdeep_avg = 0;
 		double Rntot_avg = 0, Qhtot_avg = 0, Qgtot_avg = 0, TR_avg = 0, TT_avg = 0;
 		double Trad_R = 0, Trad_T = 0, Trad_N = 0, Trad_S = 0, Trad_E = 0, Trad_W = 0;
 		double TN_avg = 0, TS_avg = 0, TE_avg = 0, TW_avg = 0;
 		double Tp = 0;
-		double TTsun = 0, TTsh = 0, TNsun = 0, TNsh = 0, TSsun = 0, TSsh = 0, TEsun = 0, TEsh = 0, TWsun = 0;
+		double TTsun = 0, TTsh = 0, TNsun = 0, TNsh = 0, TSsun = 0, TSsh = 0, TEsun = 0, TEsh = 0;
+		double TWsun = 0;
 		double TWsh = 0;
 		double zen = 0;
-		double  Kup = 0;
+		double Kup = 0;
 		double Lup = 0;
 		double Kdn_re_store = 0;
-		double Kdn_grid = 0, Kdif = 0, DR1F = 0, Kuptot_avg = 0, Luptot_avg = 0;
-		double[] angsun = new double[3];
-		double[] angsfc = new double[3];
+		double Kdn_grid = 0;
+		double Kdif = 0;
+		double DR1F = 0;
+		double Kuptot_avg = 0;
+		double Luptot_avg = 0;
 
-		int tempTimeis;
 		String outputDebugStr;
 		int numlayersMinus1 = numlayers-1;
 		int numlayersMinus2 = numlayers-2;
@@ -256,9 +283,11 @@ public class VTUF3DLoop
 		
 		boolean calcKdn = false;
 		boolean calcLdn = false; 
-		double[] calcLndReturn = energyBalances.calcLdn(Ktotfrc, Ldnfrc, restartedRunStartTimestep, ea, Ta, TUFreg3D.sigma, cloudtype, calcKdn, calcLdn);
-		Ldn_fact = calcLndReturn[0];
-		Ldn = calcLndReturn[1];
+		HashMap<String,Double> calcLdnReturn = energyBalances.calcLdn(Ktotfrc, Ldnfrc, restartedRunStartTimestep, ea, Ta, TUFreg3D.sigma, cloudtype, calcKdn, calcLdn);
+		Ldn_fact=calcLdnReturn.get("Ldn_fact");
+		Ldn=calcLdnReturn.get("Ldn");
+		calcLdnReturn=null;
+
 		
 		double Td = (4880.357 - 29.66 * Math.log(ea)) / (19.48 - Math.log(ea));
 		int numlayersMinusOne = numlayers - 1 ;
@@ -373,7 +402,7 @@ public class VTUF3DLoop
 				Ua = Math.max(0.1, Uafrc[TUFreg3D.restartedRunStartTimestep]);
 				
 				double Intresist = parameters.Intresist;
-				TreeMap layerDepthsReturnValues = energyBalances.getLayerDepths( numlayers, parameters, numlayersMinusOne, Intresist);
+				HashMap layerDepthsReturnValues = energyBalances.getLayerDepths( numlayers, parameters, numlayersMinusOne, Intresist);
 				double[] depthr=(double[]) layerDepthsReturnValues.get("depthr");
 				double[] depths=(double[]) layerDepthsReturnValues.get("depths");
 				double[] depthw=(double[]) layerDepthsReturnValues.get("depthw");
@@ -409,7 +438,7 @@ public class VTUF3DLoop
 				
 				////////////////////
 //				// Create the domain (call barray_cube)				
-				 TreeMap createDomainBarrayCubeReturnValues= energyBalances.createDomainBarrayCube(al, aw, bw, bl, sw, sw2, bh, treeXYMap,
+				HashMap createDomainBarrayCubeReturnValues= energyBalances.createDomainBarrayCube(al, aw, bw, bl, sw, sw2, bh, treeXYMap,
 							namelists, treeMapFromConfig, patchlen, zref, zH);
 				 int[][] bldhti = (int[][]) createDomainBarrayCubeReturnValues.get("bldhti");
 				 int[][] veghti = (int[][]) createDomainBarrayCubeReturnValues.get("veghti");
@@ -443,48 +472,15 @@ public class VTUF3DLoop
 
 				double dTcan_old = 0.;
 
-				double[] calcAirspaceReturn = energyBalances.calculateCanyonAirspace(aw, al, a1, a2, b1, b2, zH, patchlen, bldhti);
-				double lambdapR = calcAirspaceReturn[0];
-				double canyair = calcAirspaceReturn[1];
+				HashMap<String,Double> calculateCanyonAirspaceReturn = energyBalances.calculateCanyonAirspace(aw, al, a1, a2, b1, b2, zH, patchlen, bldhti);
+				double lambdapR = calculateCanyonAirspaceReturn.get("lambdapR");
+				double canyair = calculateCanyonAirspaceReturn.get("canyair");
+				calculateCanyonAirspaceReturn=null;
 
 				int al2 = al;
 				int aw2 = aw;
-
-//				//  now declare:
-//				int[][] veght = new int[al2 + 2][aw2 + 2];
-//				int[][] bldht = new int[al2 + 2][aw2 + 2];
-//				boolean[][][] surf_shade = new boolean[al2 + 2][aw2 + 2][bh + 2];
-//				boolean[][][] veg_shade = new boolean[al2 + 1][aw2 + 1][bh + 2];
-//				boolean[][][][] surf = new boolean[al2+1][aw2+1][bh+1][5+1];
-//				double[] Uwrite = new double[(int) Math.round(zref - 0.5)];
-//				double[] Twrite = new double[(int) Math.round(zref - 0.5)];
-//
-//				for (int x = 0; x < al + 2; x++)
-//				{
-//					for (int y = 0; y < aw + 2; y++)
-//					{
-//						bldht[x][y] = 0;
-//						veght[x][y] = 0;
-//					}
-//				}
-//
-//				//  here, copy the bldhti array to bldht then deallocate bldhti array
-//				for (int y = 0; y < aw2+1; y++)
-//				{
-//					for (int x = 0; x < al2+1; x++)
-//					{
-//						bldht[x][y] = bldhti[x][y];
-//						veght[x][y] = veghti[x][y];
-//						// ! also add up the number of tree surfaces (4 walls * tree height) + 1 roof
-//						if (veght[x][y] > 0)
-//						{
-//							numtrees2 = numtrees2 + (4 * veght[x][y]);
-//							numtreetops2 = numtreetops2 + 1;
-//						}
-//					}
-//				}
 				
-				TreeMap declareStructuresReturn = energyBalances.declareDataStructures(al2, aw2, bh, al, aw, zref, bldhti, veghti);
+				HashMap declareStructuresReturn = energyBalances.declareDataStructures(al2, aw2, bh, al, aw, zref, bldhti, veghti);
 				int numtrees2=(int) declareStructuresReturn.get("numtrees2");
 				int numtreetops2=(int) declareStructuresReturn.get("numtreetops2");
 				int[][] veght=(int[][]) declareStructuresReturn.get("veght");
@@ -498,7 +494,7 @@ public class VTUF3DLoop
 				bldhti=null;
 				veghti=null;
 
-				TreeMap convertHeightsReturn = energyBalances.convertHeightsToShading(bh, aw2, al2, al, aw, a1, a2, b1, b2, bl, bw,
+				HashMap convertHeightsReturn = energyBalances.convertHeightsToShading(bh, aw2, al2, al, aw, a1, a2, b1, b2, bl, bw,
 						bldht, veght, surf_shade, veg_shade, surf, treeMapFromConfig);				
 				surf_shade=(boolean[][][]) convertHeightsReturn.get("surf_shade");
 				veg_shade=(boolean[][][]) convertHeightsReturn.get("veg_shade");
@@ -512,13 +508,10 @@ public class VTUF3DLoop
 				int[] sfc_ab_map_y = new int[numsfc_ab];
 				int[] sfc_ab_map_z = new int[numsfc_ab];
 				int[] sfc_ab_map_f = new int[numsfc_ab];
-//				double[][] sfc = new double[numsfc][par];
-//				int[] ind_ab = new int[numsfc];
 				int[] vffile = new int[numsfc_ab];
 				int[] vfppos = new int[numsfc_ab + 1];
 				int[] vfipos = new int[numsfc_ab + 1];
 				int[] mend = new int[numsfc_ab];
-//				double[] refl_emist = new double[numsfc_ab];
 				double[] absbs = new double[numsfc_ab];
 				double[] absbl = new double[numsfc_ab];
 				double[] tots = new double[numsfc_ab];
@@ -532,8 +525,8 @@ public class VTUF3DLoop
 				double[] Tsfc = new double[numsfc_ab];
 				double[] Trad = new double[numsfc_ab];
 				double[] lambda_sfc = new double[numsfc_ab];
-				double[] Qh = new double[numsfc_ab];
-				double[] Qe = new double[numsfc_ab];
+//				double[] Qh = new double[numsfc_ab];
+//				double[] Qe = new double[numsfc_ab];
 
 				double[] currentRnet = new double[numsfc_ab];
 				double[] currentQe = new double[numsfc_ab];
@@ -597,7 +590,7 @@ public class VTUF3DLoop
 				System.out.println("bh,aw2,al2" + " " + bh + " " + aw2 + " " + al2);
 				// print *,'bh,aw2,al2',bh,aw2,al2;
 	
-				TreeMap initMainArrayReturn = energyBalances.initMainArray(a1, a2, b1, b2, bh, aw2, al2, surf, iIndex12, iab,
+				HashMap initMainArrayReturn = energyBalances.initMainArray(a1, a2, b1, b2, bh, aw2, al2, surf, iIndex12, iab,
 						sfc, sfc_ab, sfc_ab_map_x, sfc_ab_map_y, sfc_ab_map_z, sfc_ab_map_f,
 						albs, emiss, albr, albw, emisr, emisw, treeXYTreeMap, numlayers, Tsfcs,
 						thicks, lambdaavs, htcaps, thickr, lambdaavr, htcapr,
@@ -703,8 +696,8 @@ public class VTUF3DLoop
 				overall.writeOutput(Constants.inputs_store_out, "Lroof,HW_avg2,al2,aw2");
 				overall.writeOutput(Constants.inputs_store_out, Lroof + " " + HW_avg2 + " " + al2 + " " + aw2);
 				
-				TreeMap vfReturnValues = energyBalances.viewFactors(bh, aw2, al2, surf, sfc, vfcalc, mend, numsfc2,
-						a1, a2, b1, b2, sfc_ab, vffile, vfppos, vfipos, util,
+				HashMap vfReturnValues = energyBalances.viewFactors(bh, aw2, al2, surf, sfc, vfcalc, mend, numsfc2,
+						a1, a2, b1, b2, sfc_ab, vffile, vfppos, vfipos,
 						surf_shade, maxbh, ind_ab, vfSavedData);				
 				sfc=(double[][]) vfReturnValues.get("sfc");
 				mend=(int[]) vfReturnValues.get("mend");
@@ -735,7 +728,7 @@ public class VTUF3DLoop
 				while (xlat <= xlatmax)
 				{
 					String latwrite2;
-					stror = stror_in;
+					double stror = stror_in;
 					while (stror <= strormax)
 					{						
 						outputResults.outputFacetOut(facet_out, overall, xlat, stror, patchlen, yd, lpin, bh_o_bl, lpiter, bhiter);
@@ -759,7 +752,7 @@ public class VTUF3DLoop
 
 						Tsfc = util.initTsfc(Tsfc, surf, bh, aw2, al2, a2, b1, b2, a1, sfc, Tsfcs, Tsfcr, Tsfcw);
 						
-						TreeMap substrateReturnValues = energyBalances.initSubstrateTemperatures(numsfc2, sfc_ab, Tintw, Tints, numlayers, sfc,
+						HashMap substrateReturnValues = energyBalances.initSubstrateTemperatures(numsfc2, sfc_ab, Tintw, Tints, numlayers, sfc,
 								thick, lambda_sfc, numlayersMinus2, Tsfc, numlayersMinus1, IntCond);						
 						double[] A = (double[]) substrateReturnValues.get("A");
 						double[] B = (double[]) substrateReturnValues.get("B");
@@ -773,27 +766,10 @@ public class VTUF3DLoop
 						substrateReturnValues=null;
 
 						//  INITIALIZATION BEFORE TIME INTEGRATION
-//						int numabovezH = 0;
-//						int numcany = 0;
-//						for (int iabCount = 0; iabCount < numsfc_ab; iabCount++)
-//						{
-//							int i = (int) sfc_ab[iabCount][Constants.sfc_ab_i];
-//							if (sfc[i][Constants.sfc_in_array] > 1.5)
-//							{
-//								int iIndex3 = (int) sfc_ab[iabCount][Constants.sfc_ab_i];
-//								if ((sfc[iIndex3][Constants.sfc_z] - 0.5) * patchlen < zH - 0.01)
-//								{
-//									numcany = numcany + 1;
-//								}
-//								else
-//								{
-//									numabovezH = numabovezH + 1;
-//								}
-//							}
-//						}
-						int[] calcAboveReturn = energyBalances.calcAboveZh(numsfc_ab, patchlen, zH, sfc, sfc_ab);
-						int numcany = calcAboveReturn[0];
-						int numabovezH = calcAboveReturn[1];
+						HashMap<String,Integer> calcAboveZhReturn = energyBalances.calcAboveZh(numsfc_ab, patchlen, zH, sfc, sfc_ab);
+						int numcany = calcAboveZhReturn.get("numcany");
+						int numabovezH = calcAboveZhReturn.get("numabovezH");
+						calcAboveZhReturn=null;
 
 						//  initial values:
 						double Tcan = Tafrc[TUFreg3D.restartedRunStartTimestep] + 273.15 + 0.5;
@@ -824,8 +800,7 @@ public class VTUF3DLoop
 						timeis = timeis + deltat / 3600.;
 
 						// starting runs in the middle
-//						timefrc_index = 0;
-						timefrc_index = 0;		
+						int timefrc_index = 0;		
 						if (timeis > 0)
 						{
 							timefrc_index =  (int)Math.round(timeis/deltatfrc);
@@ -839,11 +814,7 @@ public class VTUF3DLoop
 				
 						//  plan area in patches
 						double Aplan = (1.0*numroof2 + numstreet2);
-
-						
-
-
-						
+				
 						//  START OF MAIN TIME
 						// LOOP----------------------------------------
 						int counter = 0;
@@ -896,216 +867,79 @@ public class VTUF3DLoop
 								ywrite = true;
 								continue;
 							}
-							//  INTERPOLATE FORCING DATA
-
-							if (timefrc[timefrc_index] <= timeis)
-							{
-								timefrc_index = Math.min(numfrc + 1, timefrc_index + 1);
-							}
-							Ktotfrc = Kdnfrc[timefrc_index - 1] + (timeis - timefrc[timefrc_index - 1]) / deltatfrc
-									* (Kdnfrc[timefrc_index] - Kdnfrc[timefrc_index - 1]);
-							Ldn = Ldnfrc[timefrc_index - 1] + (timeis - timefrc[timefrc_index - 1]) / deltatfrc
-									* (Ldnfrc[timefrc_index] - Ldnfrc[timefrc_index - 1]);
-							Ta = Tafrc[timefrc_index - 1] + (timeis - timefrc[timefrc_index - 1]) / deltatfrc
-									* (Tafrc[timefrc_index] - Tafrc[timefrc_index - 1]);
-							Ta = Ta + 273.15;
-							ea = eafrc[timefrc_index - 1] + (timeis - timefrc[timefrc_index - 1]) / deltatfrc
-									* (eafrc[timefrc_index] - eafrc[timefrc_index - 1]);
-							Ua = Math.max(0.1, Uafrc[timefrc_index - 1] + (timeis - timefrc[timefrc_index - 1])
-									/ deltatfrc * (Uafrc[timefrc_index] - Uafrc[timefrc_index - 1]));
-							Udir = Udirfrc[timefrc_index - 1] + (timeis - timefrc[timefrc_index - 1]) / deltatfrc
-									* (Udirfrc[timefrc_index] - Udirfrc[timefrc_index - 1]);
-							press = Pressfrc[timefrc_index - 1] + (timeis - timefrc[timefrc_index - 1]) / deltatfrc
-									* (Pressfrc[timefrc_index] - Pressfrc[timefrc_index - 1]);
-							//  Prata's formula (QJRMS 1996)
-							if (calcLdn)
-							{
-								Ldn = (1. - (1. + 46.5 * ea / Ta)
-										* Math.exp(-(Math.pow((1.2 + 3. * 46.5 * ea / Ta), (0.5))))) * TUFreg3D.sigma
-										* Math.pow(Ta, 4);
-								Td = (4880.357 - 29.66 * Math.log(ea)) / (19.48 - Math.log(ea));
-								Ldn = Ldn * Ldn_fact;
-							}
-
-							Udir = (Udir % 360.);
-							//  wind direction relative to the domain
-							Udirdom = Udir - stror;
-							if (Udirdom < 0.)
-							{
-								Udirdom = Udir + (360. - stror);
-							}
+							//  INTERPOLATE FORCING DATA							
+							HashMap<String,Double> interpolateForcingReturn = energyBalances.interpolateForcing(timefrc, timefrc_index, timeis, numfrc, deltatfrc, calcLdn, Ldn_fact,
+									Kdnfrc, Ldnfrc, Tafrc, eafrc, Uafrc, Pressfrc, Udirfrc, stror, Td);									
+							Ktotfrc=interpolateForcingReturn.get("Ktotfrc");
+							Ldn=interpolateForcingReturn.get("Ldn");
+							Ta=interpolateForcingReturn.get("Ta");
+							ea=interpolateForcingReturn.get("ea");
+							Ua=interpolateForcingReturn.get("Ua");
+							Udir=interpolateForcingReturn.get("Udir");
+							press=interpolateForcingReturn.get("press");
+							Td=interpolateForcingReturn.get("Td");			
+							Udirdom=interpolateForcingReturn.get("Udirdom");
+							
+							interpolateForcingReturn=null;
 
 							//  calculate frontal area index, taking into account the wind direction
-							if (calclf)
-							{
-								if (Udirdom < 180.)
-								{
-									if (Udirdom < 90.)
-									{
-										lambdaf = (util.sind(Udirdom) * 1.0*numEwall2 + util.cosd(Udirdom) * 1.0*numNwall2) / (1.0*numstreet2 + numroof2);
-									}
-									else
-									{
-										lambdaf = (util.sind(Udirdom - 90.) * 1.0*numSwall2 + util.cosd(Udirdom - 90.) * 1.0*numEwall2) / (1.0*numstreet2 + numroof2);
-									}
-								}
-								else if (Udirdom < 270.)
-								{
-									lambdaf = (util.sind(Udirdom - 180.) * 1.0*numWwall2 + util.cosd(Udirdom - 180.) * 1.0*numSwall2) / (1.0*numstreet2 + numroof2);
-								}
-								else
-								{
-									lambdaf = (util.sind(Udirdom - 270.) * 1.0*numNwall2 + util.cosd(Udirdom - 270.) * 1.0*numWwall2) / (1.0*numstreet2 + numroof2);
-								}
-							}
-
-							if (calcz0)
-							{
-								//  Macdonald's method for z0
-								z0 = zH * (1. - zd / zH) * Math.exp(-Math.pow((0.5 * 1.2 / Math.pow((0.4), 2) * (1. - zd / zH) * lambdaf), (-0.5)));
-							}
+							lambdaf = energyBalances.calculateFrontalArea(calclf, Udirdom, numEwall2, numNwall2, numstreet2, numroof2, numSwall2, numWwall2, lambdaf);
+						
+							//  Macdonald's method for z0
+							z0= energyBalances.calcZ0(calcz0, zH, zd, lambdaf, z0);
 
 							//  canyon-atm exchange:
-							double Ri = util.SFC_RI(zref - zH + z0, Ta, Tcan, Ua);
-							HashMap<String, Double> htcReturn = util.HTC(Ri, Ua, zref - zH + z0, z0, z0);
-							double Fh = htcReturn.get("Fh");
+							double Ri1 = util.SFC_RI(zref - zH + z0, Ta, Tcan, Ua);
+							HashMap<String, Double> htcReturn = util.HTC(Ri1, Ua, zref - zH + z0, z0, z0);
+							double Fh1 = htcReturn.get("Fh");
 							double httc_top = htcReturn.get("httc_out");
-							double Tlog_fact = 0.74 * httc_top * (Tcan - Ta) / Math.pow(TUFreg3D.vK, 2) / Fh;
-
-							//  -------------------------------------------
-							//  Solar angle and incoming shortwave (direct & diffuse) routines
-							double LAT = xlat * Math.PI / 180.;
-							double TM = (timeis % 24.);
+							htcReturn = null;
+							double Tlog_fact = 0.74 * httc_top * (Tcan - Ta) / Math.pow(TUFreg3D.vK, 2) / Fh1;
+							
+//							//  Solar angle and incoming shortwave (direct & diffuse) routines							
 							int yd_actual = yd + (int) (timeis / 24.);
 							yd_actual = (yd_actual % 365);
-							//  SUNPOS calculates the solar angles
-							HashMap<String, Double> sunposReturn = util.SUNPOS(yd_actual, TM, LAT);
-							double zeni = sunposReturn.get("ZEN");
-							double AZIM = sunposReturn.get("AZIM");
-							double CZ = sunposReturn.get("CZ");
-							double INOT = sunposReturn.get("INOT");
-							double CA = sunposReturn.get("CA");
-							double az = AZIM * 180. / Math.PI;
-							zen = zeni * 180. / Math.PI;
-							ralt = 90. - zen;
-
-							double Ta_sol = Ta - 273.15;
-							double Td_sol = Td - 273.15;
-							//  CLRSKY accounts for attenuation by and multiple reflection with the atmosphere
-							//  It essentially calculates direct and diffuse shortwave reaching the surface
-							//  There is also a basic cloud parameterization in it
-							HashMap<String, Double> clrskyreturn = util.CLRSKY(CZ, press / 10., zeni, Ta_sol, Td_sol,
-									INOT, Kdir, Kdif, Ktot, CA, yd_actual, alb_sfc, cloudtype, abs_aero, Ktotfrc, DR1F);
-							CZ = clrskyreturn.get(VTUF3DUtil.CZ_INDEX);
-							press = clrskyreturn.get(VTUF3DUtil.PRESS_INDEX);
-							zeni = clrskyreturn.get(VTUF3DUtil.ZEN_INDEX);
-							Ta_sol = clrskyreturn.get(VTUF3DUtil.AIR_INDEX);
-							Td_sol = clrskyreturn.get(VTUF3DUtil.DEW_INDEX);
-							INOT = clrskyreturn.get(VTUF3DUtil.INOT_INDEX);
-							Kdir = clrskyreturn.get(VTUF3DUtil.DR1_INDEX);
-							Kdif = clrskyreturn.get(VTUF3DUtil.DF1_INDEX);
-							Ktot = clrskyreturn.get(VTUF3DUtil.GL1_INDEX);
-							CA = clrskyreturn.get(VTUF3DUtil.CA_INDEX);
-							alb_sfc = clrskyreturn.get(VTUF3DUtil.alb_sfc_INDEX);
-							abs_aero = clrskyreturn.get(VTUF3DUtil.abs_aero_INDEX);
-							Ktotfrc = clrskyreturn.get(VTUF3DUtil.Ktotfrc_INDEX);
-							DR1F = clrskyreturn.get(VTUF3DUtil.DR1F_INDEX);
+							HashMap<String,Double> sunAngleCalcReturn = energyBalances.calculateSunAnglesAndSolar(xlat, timeis, yd, zen, ralt, Ta, Td, press,
+									Kdir, Kdif, Ktot, alb_sfc, cloudtype, abs_aero, Ktotfrc , calcKdn, DR1F, overall , yd_actual);
+							zen=sunAngleCalcReturn.get("zen");
+							ralt=sunAngleCalcReturn.get("ralt");
+							press=sunAngleCalcReturn.get("press");
+							Kdir=sunAngleCalcReturn.get("Kdir");
+							Kdif=sunAngleCalcReturn.get("Kdif");
+							Kdif=sunAngleCalcReturn.get("Kdif");
+							Ktot=sunAngleCalcReturn.get("Ktot");
+							alb_sfc=sunAngleCalcReturn.get("alb_sfc");
+							abs_aero=sunAngleCalcReturn.get("abs_aero");
+							Ktotfrc=sunAngleCalcReturn.get("Ktotfrc");
+							DR1F=sunAngleCalcReturn.get("DR1F");
+							double Kbeam=sunAngleCalcReturn.get("Kbeam");
+							double az=sunAngleCalcReturn.get("az");
+							double TM=sunAngleCalcReturn.get("TM");							
+							double Kdir_NoAtm=sunAngleCalcReturn.get("Kdir_NoAtm");
+							double Kdir_Calc=sunAngleCalcReturn.get("Kdir_Calc");
+							double Kdif_Calc=sunAngleCalcReturn.get("Kdif_Calc");					
+							sunAngleCalcReturn=null;
 							
-							double Kdir_NoAtm = INOT * Math.cos(zeni);
-							double Kdir_Calc = Kdir;
-							double Kdif_Calc = Kdif;
-
-							// to allow the solar radiation routine to calc solar radiation amounts if they are not input
-							if (!calcKdn)
-							{
-								if (Ktotfrc > 0.)
-								{
-									//  average of solar scheme DF/Ktot and that calculated from the Orgill/Hollands param			
-									Kdif = (Ktotfrc - DR1F + Ktotfrc * Kdif / (Ktot + 1.e-9)) / 2.;
-									Kdir = Ktotfrc - Kdif;
-								}
-								else
-								{
-									Kdif = 0.;
-									Kdir = 0.;
-								}
-							}
-
-							Ktot = Kdir + Kdif;
-
-							//  SO THAT KBEAM (I.E. FLUX DENSITY PERP TO SUN) DOES NOT GET TOO BIG
-							//  FOR LOW SUN ANGLES (IN CASE OBSERVED KDN AND CALCULATED KDN DO NOT AGREE EXACTLY)
-							if (!calcKdn && (Kdir - Kdir_Calc) / Math.max(1.e-9, Kdir_Calc) > 0.15 && ralt < 10.0)
-							{
-								double kDirPrev = Kdir;
-								Kbeam = Math.min(INOT * Kdir_Calc / Math.max(1.e-9, Kdir_NoAtm), Kdir / Math.max(1.e-9, util.sind(ralt)));
-if (Kbeam > 10000)
-{
-	Kbeam = 0.0;
-}														
-								Kdir = Kbeam * util.sind(ralt);
-								Kdif = Ktotfrc - Kdir;
-							}
-							else
-							{
-								Kbeam = Kdir / Math.max(1.e-9, util.sind(ralt));
-//System.out.println("Kbeam2 " + Kbeam+ " " + ralt);
-if (Kbeam > 10000)
-{
-	Kbeam = 0.0;
-}								
-								if (Kbeam > 1390.)
-								{
-									System.out.println("KBEAM unreasonable; Kbeam,Kdir,ralt,sind(ralt) = " + " " + Kbeam
-											+ " " + Kdir + " " + ralt + " " + util.sind(ralt));
-	
-									overall.writeOutput(Constants.inputs_store_out,
-											"KBEAM unreasonable; Kbeam,Kdir,ralt,sind(ralt) = " + " " + Kbeam + " "
-													+ Kdir + " " + ralt + " " + util.sind(ralt));
-			
-									if (Kbeam > 1370.0 * 2.0 || Ktot > 1370.)
-									{
-										System.out.println(
-												"KBEAM or KTOT unreasonable; Ktot,Kbeam,Kdir,ralt,sind(ralt) = " + " "
-														+ Ktot + " " + Kbeam + " " + Kdir + " " + ralt + " "
-														+ util.sind(ralt));
-						
-										overall.writeOutput(Constants.inputs_store_out,
-												"KBEAM or KTOT unreasonable; Ktot,Kbeam,Kdir,ralt,sind(ralt) = " + " "
-														+ Ktot + " " + Kbeam + " " + Kdir + " " + ralt + " "
-														+ util.sind(ralt));
-						
-										System.exit(1);
-									}
-								}
-							}
-							// !treeXYMapSunlightPercentageTotal=0.
-							// !treeXYMapSunlightPercentagePoints=0.
-
 							if (Ktot > 1.0E-3)
 							{
-//System.out.println("++++++++++++++++++++++++start Shade=" + (System.currentTimeMillis() - TUFreg3D.startTime)/1000./60. );	
 								//  Solar shading of patches
 								// -----------------------------------------
 								//TODO figure out how to replace TestflxData, variable TD (total transission) with online Maespa
-										HashMap shadeReturn = Shade.shade(stror, az, ralt, ypos, surf, surf_shade, al2, aw2,
+										HashMap<String,double[][]> shadeReturn = Shade.shade(stror, az, ralt, surf, surf_shade, al2, aw2,
 										maxbh, par, sfc, numsfc, a1, a2, b1, b2, numsfc2, sfc_ab, par_ab, veg_shade,
 										timeis, yd_actual, treeXYMapSunlightPercentageTotal, treeXYMap,
 										maespaTestflxData);
 								sfc = (double[][]) shadeReturn.get("sfc");
 								sfc_ab = (double[][]) shadeReturn.get("sfc_ab");
 								treeXYMapSunlightPercentageTotal = (double[][]) shadeReturn.get("treeXYMapSunlightPercentageTotal");
-//System.out.println("++++++++++++++++++++++++end Shade=" + (System.currentTimeMillis() - TUFreg3D.startTime)/1000./60. );	
+								shadeReturn = null;
 							}
 							
 							
 							
 							System.out.println(timeis + " " + outpt_tm + " " + deltat + " " + timewrite);
 							if (
-//									(timeis == 0) ||
-//									(
 											(timeis % outpt_tm) * 3600.0 < deltat && (int) (timeis * 100.) != timewrite
-//									)
 							   )
 							{
 								System.out.println("after met at " + TM);
@@ -1216,9 +1050,8 @@ if (Kbeam > 10000)
 							boolean tsfcLupBalanceContinue = true;
 							while (tsfcLupBalanceContinue)
 							{
-								// 898 continue
-								// !print *,'after 898'
-								Tdiffmax = 0.;
+								double Lemit5;
+								double Tdiffmax = 0.;
 
 								if (solar_refl_done || Ktot <= 0.)
 								{
@@ -1227,217 +1060,47 @@ if (Kbeam > 10000)
 									//  RADIATION INITIALIZATION
 
 									//  zeroth longwave reflection (i.e. emission)
-									vfsum2 = 0.;
-
-									for (int iabCount = 0; iabCount < numsfc2; iabCount++)
-									{
-										int iIndex4 = (int) sfc_ab[iabCount][Constants.sfc_ab_i];
-										refltl[iabCount] = 0.;
-										refll[iabCount] = sfc[iIndex4][Constants.sfc_emiss] * TUFreg3D.sigma * Math.pow(Tsfc[iabCount], 4);
-										absbl[iabCount] = 0.;
-										vfsum2 = vfsum2 + (1. - sfc[iIndex4][Constants.sfc_evf]);
-									}
-									//  MULTIPLE REFLECTION
-									Lup = 0.;
-									double Lup_refl = 0.;
-									Lup_refl_old = 0.;
-									double refldiff = 1.1;
-									Lup_refl = 0.;
-									Lemit5 = 0.;
-									int k = 0;
-									//  MAIN reflection loop: does at least 1 longwave reflection, and goes until change in
-									// overall (1-emis) is less than dalb multiplied by a factor that recognizes that there is
-									// little or no multiple reflection at roof level and above (lambdapR is lambdap at roof level)
-									while ((k < 2) || (refldiff >= dalb * (1. - lambdapR)))
-									{
-										k = k + 1;
-										if (k > 20) // otherwise, we seem to get trapped in this loop
-										{
-											// exit ;
-											break;
-										}
-
-										// save reflected values from last reflection
-										for (int iabCount = 0; iabCount < numsfc2; iabCount++)
-										{
-											int iIndex5 = (int) sfc_ab[iabCount][Constants.sfc_ab_i];
-											reflpl[iabCount] = refll[iabCount];
-											refll[iabCount] = 0.;
-											if (k == 1)
-											{
-												absbl[iabCount] = sfc[iIndex5][Constants.sfc_emiss] * (1. - sfc[iIndex5][Constants.sfc_evf]) * Ldn;
-												if (absbl[iabCount] > 2000.)
-												{
-													System.out.println("1,iab,absbl[iab]" + " " + iabCount + " " + absbl[iabCount]);
-												}
-												refll[iabCount] = (1. - sfc[iIndex5][Constants.sfc_emiss]) * (1. - sfc[iIndex5][Constants.sfc_evf]) * Ldn;
-												Lup_refl = Lup_refl - sfc[iIndex5][Constants.sfc_emiss] * (1. - sfc[iIndex5][Constants.sfc_evf]) * TUFreg3D.sigma * Math.pow(Tsfc[iabCount], 4);
-												Lemit5 = Lemit5 + sfc[iIndex5][Constants.sfc_emiss] * sfc[iIndex5][Constants.sfc_evf] * TUFreg3D.sigma * Math.pow(Tsfc[iabCount], 4);
-												refltl[iabCount] = 0.;
-											}
-										}
-										// open view factor files
-										for (int iabCount = 0; iabCount < numsfc2; iabCount++)
-										{
-											double vfOpen;
-											int iIndex5 = (int) sfc_ab[iabCount][Constants.sfc_ab_i];
-											// do p=vfppos[iab],vfppos[iab+1]-1
-											for (int pCount = vfppos[iabCount]; pCount < vfppos[iabCount + 1]  ; pCount++)
-											{
-//												vf = vf3[pCount];
-												vfOpen = vf3.get(pCount);
-//												jab = vf3j[pCount];
-												jab = vf3j.get(pCount);
-												absbl[iabCount] = absbl[iabCount] + vfOpen * reflpl[jab] * sfc[iIndex5][Constants.sfc_emiss];
-												if (absbl[iabCount] > 2000.)
-												{
-													// write(6,*)"2,iab,absbl[iab]",iab,absbl[iab]
-												}
-												refll[iabCount] = refll[iabCount] + vfOpen * reflpl[jab] * (1. - sfc[iIndex5][Constants.sfc_emiss]);
-											}
-
-											if (sfc[iIndex5][Constants.sfc_in_array] > 1.5)
-											{
-												Lup = Lup + (1. - sfc[iIndex5][Constants.sfc_evf]) * reflpl[iabCount];
-												Lup_refl = Lup_refl + (1. - sfc[iIndex5][Constants.sfc_evf]) * reflpl[iabCount];
-											}
-
-											
-										}
-
-										for (int iabCount = 0; iabCount < numsfc2; iabCount++)
-										{
-											refltl[iabCount] = refltl[iabCount] + refll[iabCount];
-										}
-
-										refldiff = (Lup_refl - Lup_refl_old) / (1.0*avg_cnt) / (Ldn + Lemit5 / (1.0*avg_cnt));
-
-										Lup_refl_old = Lup_refl;
-										// 313 continue
-									}
-									for (int iabCount = 0; iabCount < numsfc2; iabCount++)
-									{
-										int iIndex5 = (int) sfc_ab[iabCount][Constants.sfc_ab_i];
-										refltl[iabCount] = refltl[iabCount] - sfc[iIndex5][Constants.sfc_evf] * refll[iabCount];
-										absbl[iabCount] = absbl[iabCount] + sfc[iIndex5][Constants.sfc_evf] * refll[iabCount];
-									}
-									// ------------------------------------
+									HashMap zeroithLongwaveReflectionReturn = energyBalances.zeroithLongwaveReflection(dalb, lambdapR, numsfc2, sfc_ab, refll, absbl, reflpl,
+											sfc, Ldn, refltl, Tsfc, vfppos, vf3, vf3j, avg_cnt);
+									Lup=(double) zeroithLongwaveReflectionReturn.get("Lup");
+									Lup_refl_old=(double) zeroithLongwaveReflectionReturn.get("Lup_refl_old");
+									double Lup_refl=(double) zeroithLongwaveReflectionReturn.get("Lup_refl");
+									Lemit5=(double) zeroithLongwaveReflectionReturn.get("Lemit5");
+									refll=(double[]) zeroithLongwaveReflectionReturn.get("refll");
+									absbl=(double[]) zeroithLongwaveReflectionReturn.get("absbl");
+									reflpl=(double[]) zeroithLongwaveReflectionReturn.get("reflpl");
+									refltl=(double[]) zeroithLongwaveReflectionReturn.get("refltl");	
+									double refldiff=(double) zeroithLongwaveReflectionReturn.get("refldiff");
+									double vfsum2=(double) zeroithLongwaveReflectionReturn.get("vfsum2");
+									zeroithLongwaveReflectionReturn = null;
 								}
 								else
 								{
-									// SOLAR and LONGWAVE (solar has NOT already been done in previous Tsfc-Lup iteration)
+									// SOLAR and LONGWAVE (solar has NOT already been done in previous Tsfc-Lup iteration) 
 									// RADIATION INITIALIZATION
-
-									// the unit vector pointing from the surface towards the sun
-									angdif = az - stror;
-									if (angdif < 0.)
-									{
-										angdif = az + (360. - stror);
-									}
-									angsun[TUFreg3D.ONE] = util.sind(angdif) * util.cosd(ralt);
-									angsun[TUFreg3D.TWO] = util.cosd(angdif) * util.cosd(ralt);
-									angsun[TUFreg3D.THREE] = util.sind(ralt);
-
-									// ! first solar absorption and reflection, and zeroth longwave reflection (i.e. emission)
-									solarin = 0.;
-									Kdn_grid = 0.;
-									nKgrid = 0;
-									vfsum2 = 0.;
-
-									for (int iabCount = 0; iabCount < numsfc_ab; iabCount++)
-									{
-										int iIndex6 = (int) sfc_ab[iabCount][Constants.sfc_ab_i];
-										refll[iabCount] = sfc[iIndex6][Constants.sfc_emiss] * TUFreg3D.sigma * Math.pow(Tsfc[iabCount], 4);
-										absbl[iabCount] = 0.;
-										if (first_write)
-										{
-											vfsum2 = vfsum2 + (1. - sfc[iIndex6][Constants.sfc_evf]);
-										}
-										if (Ktot > 1.0e-3)
-										{
-											absbs[iabCount] = (1. - sfc[iIndex6][Constants.sfc_albedo]) * Kdif * (1. - sfc[iIndex6][Constants.sfc_evf]);
-//System.out.println("absbs[iabCount]1 " + absbs[iabCount] + " " + timeis);
-											refls[iabCount] = sfc[iIndex6][Constants.sfc_albedo] * Kdif * (1. - sfc[iIndex6][Constants.sfc_evf]);
-
-											Kdn_grid = Kdn_grid + Kdif * (1. - sfc[iIndex6][Constants.sfc_evf]);
-											nKgrid = nKgrid + 1;
-											if (sfc[iIndex6][Constants.sfc_in_array] > 1.5)
-											{
-												solarin = solarin + Kdif * (1. - sfc[iIndex6][Constants.sfc_evf]);
-											}
-										}
-										// ! if patch is at least partly sunlit:
-										if (sfc[iIndex6][Constants.sfc_sunlight_fact] > 0.5)
-										{
-											angsfc[TUFreg3D.ONE] = sfc[iIndex6][Constants.sfc_x_vector];
-											angsfc[TUFreg3D.TWO] = sfc[iIndex6][Constants.sfc_y_vector];
-											angsfc[TUFreg3D.THREE] = sfc[iIndex6][Constants.sfc_z_vector];
-											//  if we stay with plane parallel surfaces, the following dot product
-											//  need only be computed 3-4 times (roof/street plus 2-3 sunlit walls)
-											// call dotpro(angsun,angsfc,3,dp,g)
-											HashMap<String, Double> returnValues = Dotpro.dotpro(angsun, angsfc, 3);
-											double dp, g;
-											dp = returnValues.get("dp");
-											g = returnValues.get("g");
-
-											absbs[iabCount] = absbs[iabCount] + (1. - sfc[iIndex6][Constants.sfc_albedo])
-													* Kbeam * Math.cos((g)) * sfc[iIndex6][Constants.sfc_sunlight_fact] / 4.;
-//System.out.println("absbs[iabCount]2 " + absbs[iabCount]);
-											refls[iabCount] = refls[iabCount] + sfc[iIndex6][Constants.sfc_albedo] * Kbeam * Math.cos((g)) * sfc[iIndex6][Constants.sfc_sunlight_fact] / 4.;
-
-											Kdn_grid = Kdn_grid + Kbeam * Math.cos((g)) * sfc[iIndex6][Constants.sfc_sunlight_fact] / 4.;
-
-											if (sfc[iIndex6][Constants.sfc_in_array] > 1.5)
-											{
-												solarin = solarin + Kbeam * Math.cos((g)) * sfc[iIndex6][Constants.sfc_sunlight_fact] / 4.;
-											}
-										}
-										else
-										{
-											absbs[iabCount] = 0.;
-											refls[iabCount] = 0.;
-										}
-										reflts[iabCount] = refls[iabCount];
-									}
-									if (Math.abs(vfsum2 - (1.0*avg_cnt)) / (1.0*avg_cnt) > 0.05 && first_write)
-									{
-										System.out.println("patch sky view factor sum > 5% inaccurate");
-										System.out.println("value = " + " " + vfsum2 + " " + "should be = " + " " + avg_cnt);
-										System.exit(1);
-									}
-									if (first_write)
-									{
-										double svferror = 100. * Math.abs(vfsum2 - (1.0*avg_cnt)) / (1.0*avg_cnt);
-										if (svferror > svfe_store)
-										{
-											svfe_store = svferror;
-										}
-										System.out.println("ABSOLUTE VALUE OF RELATIVE SKY VIEW FACTOR ERROR ->" + " " + svferror + " " + "%");
-
-										overall.writeOutput(Constants.inputs_store_out,
-												"-----lambdap,H/L,latitude,streetdir" + " " + lpin[lpiter] + " "
-														+ bh_o_bl[bhiter] + " " + xlat + " " + stror + " " + "-----");
-										overall.writeOutput(Constants.inputs_store_out,
-												"ABSOLUTE VALUE OF RELATIVE SVF ERROR ->" + " " + svferror + " "
-														+ "% (for the central urban unit)");
-										System.out.println("------------------------------------------");
-									}
-
-									// compare input Kdn (wrong due to raster grid causing too many
-									// or too few patches to be sunlit - representing patches by their center)
-									// the resolution for only the shading routine could be increased to help deal with this problem
-									Kdn_grid = Kdn_grid / ((wavelenx * waveleny));
-									if (Kdir + Kdif > 0.0)
-									{
-										Kdn_diff = Kdn_diff + 100. * Math.abs(Kdn_grid - Kdir - Kdif) / (Kdir + Kdif + 1.e-9);
-										nKdndiff = nKdndiff + 1;
-									}
-									if (Math.abs(Kdn_grid - Kdir - Kdif) > Kdn_ae_store)
-									{
-										Kdn_ae_store = Math.abs(Kdn_grid - Kdir - Kdif);
-										Kdn_re_store = Math.abs(Kdn_grid - Kdir - Kdif) / (Kdir + Kdif + 1.e-9);
-									}
-			
+									HashMap solarAndLongwaveReturn = energyBalances.solarAndLongwaveReflections(az, stror, ralt, numsfc_ab, sfc, sfc_ab,
+											Kdn_grid, first_write, refll, absbl, Ktot, Tsfc, Kdif, Kbeam, reflts, avg_cnt, svfe_store,
+											overall, bh_o_bl, lpiter, bhiter, xlat, wavelenx, waveleny, Kdir, Kdn_ae_store, Kdn_diff, 
+											nKdndiff, Kdn_re_store, absbs, refls, lpin);									
+									Kdn_grid=(double) solarAndLongwaveReturn.get("Kdn_grid" );
+									double vfsum2=(double) solarAndLongwaveReturn.get("vfsum2" );
+									refll=(double[]) solarAndLongwaveReturn.get("refll");
+									absbl=(double[]) solarAndLongwaveReturn.get("absbl");
+									absbs=(double[]) solarAndLongwaveReturn.get("absbs");
+									absbs=(double[]) solarAndLongwaveReturn.get("absbs");
+									refls=(double[]) solarAndLongwaveReturn.get("refls");
+									refls=(double[]) solarAndLongwaveReturn.get("refls");
+									reflts=(double[]) solarAndLongwaveReturn.get("reflts");
+									svfe_store=(double) solarAndLongwaveReturn.get("svfe_store");
+									lpin=(double[]) solarAndLongwaveReturn.get("lpin");					
+									bh_o_bl=(double[]) solarAndLongwaveReturn.get("bh_o_bl");
+									Kdn_ae_store=(double) solarAndLongwaveReturn.get("Kdn_ae_store");
+									Kdn_diff=(double) solarAndLongwaveReturn.get("Kdn_diff");
+									nKdndiff=(double) solarAndLongwaveReturn.get("nKdndiff");
+									Kdn_re_store=(double) solarAndLongwaveReturn.get("Kdn_re_store");
+									solarAndLongwaveReturn = null;
+									
+								
 									// MULTIPLE REFLECTION
 									//  do the same number of reflections for  both solar and longwave, doing the long- and short-wave
 									// reflections together is for efficiency reasons: view factors then
@@ -1453,113 +1116,51 @@ if (Kbeam > 10000)
 									Lemit5 = 0.;
 									int k = 0;
 
-									//  MAIN reflection loop: does at least 2 shortwave and 1 longwave reflection, and goes until change in
-									// both overall albedo and overall (1-emis) are less than dalb multiplied by a
-									// factor that recognizes that there is little or no multiple reflection at roof level and above (lambdapR is  lambdap at roof level)
-									while (k < 2 || refldiff >= dalb * (1. - lambdapR))
-									{
-										// do 314 while
-										// (k<2||refldiff>=dalb*(1.-lambdapR))
-										k = k + 1;
-
-										// save reflected values from last reflection
-										for (int iabCount = 0; iabCount < numsfc_ab; iabCount++)
-										{
-											int iIndex7 = (int) sfc_ab[iabCount][Constants.sfc_ab_i];
-											reflps[iabCount] = refls[iabCount];
-											reflpl[iabCount] = refll[iabCount];
-											refls[iabCount] = 0.;
-											refll[iabCount] = 0.;
-											if (k == 1)
-											{
-												absbl[iabCount] = sfc[iIndex7][Constants.sfc_emiss] * (1. - sfc[iIndex7][Constants.sfc_evf]) * Ldn;
-												refll[iabCount] = (1. - sfc[iIndex7][Constants.sfc_emiss]) * (1. - sfc[iIndex7][Constants.sfc_evf]) * Ldn;
-												if (sfc[iIndex7][Constants.sfc_in_array] > 1.5)
-												{
-													Lup_refl = Lup_refl - sfc[iIndex7][Constants.sfc_emiss] * (1. - sfc[iIndex7][Constants.sfc_evf]) * TUFreg3D.sigma
-															* Math.pow(Tsfc[iabCount], 4);
-													Lemit5 = Lemit5 + sfc[iIndex7][Constants.sfc_emiss] * sfc[iIndex7][Constants.sfc_evf]
-																	* TUFreg3D.sigma * Math.pow(Tsfc[iabCount], 4);
-												}
-												refltl[iabCount] = 0.;
-											}
-										}
-
-										// open view factor files
-										for (int iabCount = 0; iabCount < numsfc2; iabCount++)
-										{
-											double vfOpen;
-											int iIndex8 = (int) sfc_ab[iabCount][Constants.sfc_ab_i];
-											for (int pCount = vfppos[iabCount]; pCount < vfppos[iabCount + 1] ; pCount++)
-											{
-//												vf = vf3[pCount];
-												vfOpen = vf3.get(pCount);
-//												jab = vf3j[pCount];
-												jab = vf3j.get(pCount);
-												absbs[iabCount] = absbs[iabCount] + vfOpen * reflps[jab] * (1. - sfc[iIndex8][Constants.sfc_albedo]);
-//if (iabCount==0) System.out.println("absbs[iabCount]3 " + absbs[iabCount]);
-												refls[iabCount] = refls[iabCount] + vfOpen * reflps[jab] * sfc[iIndex8][Constants.sfc_albedo];
-												absbl[iabCount] = absbl[iabCount] + vfOpen * reflpl[jab] * sfc[iIndex8][Constants.sfc_emiss];
-												refll[iabCount] = refll[iabCount] + vfOpen * reflpl[jab] * (1. - sfc[iIndex8][Constants.sfc_emiss]);
-											}
-
-											if (sfc[iIndex8][Constants.sfc_in_array] > 1.5)
-											{
-												Kup = Kup + (1. - sfc[iIndex8][Constants.sfc_evf]) * reflps[iabCount];
-												Lup = Lup + (1. - sfc[iIndex8][Constants.sfc_evf]) * reflpl[iabCount];
-												Lup_refl = Lup_refl + (1. - sfc[iIndex8][Constants.sfc_evf]) * reflpl[iabCount];
-												Kup_refl = Kup_refl + (1. - sfc[iIndex8][Constants.sfc_evf]) * reflps[iabCount];
-											}
-
-										}
-
-										for (int iabCount = 0; iabCount < numsfc2; iabCount++)
-										{
-											reflts[iabCount] = reflts[iabCount] + refls[iabCount];
-											refltl[iabCount] = refltl[iabCount] + refll[iabCount];
-										}
-
-										// parameter that determines whether or not to do another reflection
-										refldiff = Math.max( (Lup_refl - Lup_refl_old) / (1.0*avg_cnt) / (Ldn + Lemit5 / (1.0*avg_cnt)),
-												(Kup_refl - Kup_refl_old) / (1.0*avg_cnt) / Math.max(1.e-9, (Kdir + Kdif)));
-
-										Lup_refl_old = Lup_refl;
-										Kup_refl_old = Kup_refl;
-
-										// 314 continue
-									}
-									// !print *,'after 314'
+									HashMap mainReflectionReturn = energyBalances.mainReflectionLoop(k, refldiff, dalb, lambdapR, numsfc_ab, sfc, sfc_ab,
+											refls, refll, reflps, reflpl, absbl, Ldn, refltl, numsfc2, Tsfc, absbs, reflts, Lup_refl, Lemit5,
+											vf3, vf3j, vfppos, avg_cnt, Lup_refl_old, Kup_refl, Kup, Lup, Kup_refl_old, Kdir, Kdif);									
+									refls=(double[]) mainReflectionReturn.get("refls");
+									refll=(double[]) mainReflectionReturn.get("refll");
+									reflps=(double[]) mainReflectionReturn.get("reflps");
+									reflpl=(double[]) mainReflectionReturn.get("reflpl");
+									absbl=(double[]) mainReflectionReturn.get("absbl");
+									refltl=(double[]) mainReflectionReturn.get("refltl");
+									absbs=(double[]) mainReflectionReturn.get("absbs");
+									reflts=(double[]) mainReflectionReturn.get("reflts");
+									Lup_refl=(double) mainReflectionReturn.get("Lup_refl");
+									Lemit5=(double) mainReflectionReturn.get("Lemit5");
+									Kup_refl=(double) mainReflectionReturn.get("Kup_refl");
+									Kup_refl=(double) mainReflectionReturn.get("Kup_refl");
+									Kup=(double) mainReflectionReturn.get("Kup");
+									Lup=(double) mainReflectionReturn.get("Lup");
+									Kup_refl_old=(double) mainReflectionReturn.get("Kup_refl_old");
+	
 									solar_refl_done = true;
-
 								}
 
 								alb_sfc = Math.min(albr * lpactual + albs * (1. - lpactual), Kup / (1.0*avg_cnt) / Math.max(1.e-9, (Kdir + Kdif)));
-//System.out.println("alb_sfc " + alb_sfc);
 
-								// remaining reflected radiation is partitioned by assuming that sfcs with
-								// larger environmental view factors will absorb an amount of this radiation
-								// proportional to their total view of other surfaces (approx.), and the
-								// remainder will leave the system (to the sky)
-								for (int iabCount = 0; iabCount < numsfc2; iabCount++)
-								{
-									int iIndex9 = (int) sfc_ab[iabCount][Constants.sfc_ab_i];
-									tots[iabCount] = reflts[iabCount] + absbs[iabCount];
-									totl[iabCount] = refltl[iabCount] + absbl[iabCount];
-									reflts[iabCount] = reflts[iabCount] - sfc[iIndex9][Constants.sfc_evf] * refls[iabCount];
-									absbs[iabCount] = absbs[iabCount] + sfc[iIndex9][Constants.sfc_evf] * refls[iabCount];
-//if (iabCount==0) System.out.println("absbs[iabCount]4 " + absbs[iabCount]);
-									refltl[iabCount] = refltl[iabCount] - sfc[iIndex9][Constants.sfc_evf] * refll[iabCount];
-									absbl[iabCount] = absbl[iabCount] + sfc[iIndex9][Constants.sfc_evf] * refll[iabCount];
-									Kup = Kup + (1. - sfc[iIndex9][Constants.sfc_evf]) * refls[iabCount];
-									Lup = Lup + (1. - sfc[iIndex9][Constants.sfc_evf]) * refll[iabCount];
-									
-									
-								}
+//								// remaining reflected radiation is partitioned by assuming that sfcs with
+//								// larger environmental view factors will absorb an amount of this radiation
+//								// proportional to their total view of other surfaces (approx.), and the
+//								// remainder will leave the system (to the sky)
+//								for (int iabCount = 0; iabCount < numsfc2; iabCount++)
+
+								HashMap remainingReflectionsReturn = energyBalances.remainingReflections(numsfc2, sfc, sfc_ab, absbs, absbl, 
+										refls, refll, tots, totl, reflts, refltl, Kup, Lup);								
+								absbs=(double[]) remainingReflectionsReturn.get("absbs");
+								absbl=(double[]) remainingReflectionsReturn.get("absbl");
+								tots=(double[]) remainingReflectionsReturn.get("tots");
+								totl=(double[]) remainingReflectionsReturn.get("totl");
+								reflts=(double[]) remainingReflectionsReturn.get("reflts");
+								refltl=(double[]) remainingReflectionsReturn.get("refltl");
+								Kup=(double) remainingReflectionsReturn.get("Kup");
+								Lup=(double) remainingReflectionsReturn.get("Lup");
+								remainingReflectionsReturn=null;
 
 								//
 								// -------------------------------------------------------------
 								// CONVECTION and Tsfc
-//System.out.println("++++++++++++++++++++++++start convection=" + (System.currentTimeMillis() - TUFreg3D.startTime)/1000./60.);	
 								rhoa = press * 100. / 287.04 / Ta;
 								rhocan = press * 100. / 287.04 / Tcan;
 								// this is the average heat capacity of air per m2 below zH
@@ -1567,126 +1168,35 @@ if (Kbeam > 10000)
 								// zH if all the buildings were put into one massive building of height
 								// much lower than zH, of course - covering the entire area of interest)
 								Cairavg = canyair * rhocan * TUFreg3D.cpair;
-
-								// momentum transfer, log wind profile
-								double Tzd = lambdapR * Tsfc_R / (1.0*numroof2) + (1. - lambdapR) * Tcan;
-								Ri = util.SFC_RI(zref - zd, Ta, Tzd, Ua);
-								HashMap<String, Double> cdReturn = VTUF3DUtil.CD(Ri, zref - zd, z0, z0 / moh);
-								Fm = cdReturn.get("Fm");
-								cdtown = cdReturn.get("cd_out");
-								ustar = Math.sqrt(cdtown) * Ua;
-								Qhcan_kin = Math.max(0., Qhcan / rhocan / TUFreg3D.cpair);
-								wstar = Math.pow((9.806 / Tcan * Qhcan_kin * zH), (1. / 3.));
-
-								// BISECTION METHOD FOR U PROFILE!!!
-								double bp = ustar / TUFreg3D.vK / Math.sqrt(Fm);
-								double bm = zH - zd;
-								// The following is what Masson uses (but his model is an area average), so
-								// I've replaced it with an equivalent 3-D expression
-								double bn = -2. * lambdaf / (1. - lambdapR) / 4.;
-								double bq = z0;
-
-								if (ustar / TUFreg3D.vK * Math.log((zH - zd) / z0) / Math.sqrt(Fm) > Ua
-										|| ustar / TUFreg3D.vK * Math.log((zH - zd) / z0) / Math.sqrt(Fm)
-												* Math.exp(-2. * lambdaf / (1. - lambdapR) / 4.) > ustar / TUFreg3D.vK
-														* Math.log((zH - zd) / z0) / Math.sqrt(Fm))
-								{
-									System.out.println("Utop larger than Ua, or Ucan larger than Utop");
-									// write(6,*)"Utop larger than Ua, or Ucan
-									// larger than Utop";
-									// stop;
-									System.exit(1);
-								}
-
-								double CL = 0.01;
-								double CR = CL + 0.1;
-								double FR = bp * Math.exp(-CR * zH) / bm / CR - bp * Math.log(bm / bq) * (1. - Math.exp(bn))
-										/ (Math.exp(CR * zH) - Math.exp(CR * zH / 2.));
-								while (FR >= 1.e-20)
-								{
-									CR = CR + 0.1;
-									FR = bp * Math.exp(-CR * zH) / bm / CR - bp * Math.log(bm / bq)
-											* (1. - Math.exp(bn)) / (Math.exp(CR * zH) - Math.exp(CR * zH / 2.));
-									// 957 continue
-								}
-
-								while (CR - CL > 0.001)
-								{
-									double Cmid = (CR + CL) / 2.;
-									double Fmid = bp * Math.exp(-Cmid * zH) / bm / Cmid - bp * Math.log(bm / bq) * (1. - Math.exp(bn)) / (Math.exp(Cmid * zH) - Math.exp(Cmid * zH / 2.));
-									if (Fmid > 0.)
-									{
-										CL = Cmid;
-									}
-									else if (Fmid < 0.)
-									{
-										CR = Cmid;
-									}
-									else if (Fmid == 0.)
-									{
-										Ccan = Cmid;
-										// goto 959;
-										break;
-									}
-									else
-									{
-										System.out.println("problem in bisection method");
-										System.exit(1);
-									}
-									// 958 continue
-								}
-								Ccan = (CR + CL) / 2.;
-								// 959 continue
-						
-								// constants for the canyon wind profile (Ccan also)
-								Bcan = bp * Math.exp(-Ccan * zH) / bm / Ccan;
-								Acan = -Bcan * Math.exp(Ccan * zH) + bp * Math.log(bm / bq);
-
-								for (int iii = 0; iii < (int) Math.round(zH - 0.5); iii++)
-								{
-									zzz = 1.0*iii;
-									Ucantst = Acan + Bcan * Math.exp(Ccan * zzz);
-									if (Ucantst > Ua || Ucantst < 0.)
-									{
-										double Ucan = Double.NaN;
-										System.out.println("bad Ucan at z=" + " " + zzz + " " + Ucan);
-										System.exit(1);
-									}
-								}
-
-								for (int iii = 0; iii < (int) Math.round(zref - 0.5); iii++)
-								{
-									zzz = 1.0*iii;
-									if (zzz < zH)
-									{
-										Uwrite[iii] = Acan + Bcan * Math.exp(Ccan * zzz);
-										Twrite[iii] = Tcan;
-									}
-									else
-									{
-										Uwrite[iii] = ustar / TUFreg3D.vK * Math.log((zzz - zd) / z0) / Math.sqrt(Fm);
-										Twrite[iii] = Tcan - Tlog_fact / Uwrite[iii] * Math.pow((Math.log((zzz - zH + z0) / z0)), 2);
-									}
-								}
-
-								double Ucanpy = Acan + Bcan * Math.exp(Ccan * zH / 2.);
-
+	
+								HashMap logWindProfileReturn = energyBalances.logWindProfile(lambdapR, Tsfc_R, numroof2, Tcan, zref, zd, Ta, Ua,
+											Fm, ustar, Qhcan, rhocan, zH, z0, moh, wstar, lambdaf, Ccan, Acan, Bcan, Uwrite, Twrite, Tlog_fact);								
+								Fm=(double) logWindProfileReturn.get("Fm");
+								ustar=(double) logWindProfileReturn.get("ustar");
+								wstar=(double) logWindProfileReturn.get("wstar");
+								Ccan=(double) logWindProfileReturn.get("Ccan");
+								Bcan=(double) logWindProfileReturn.get("Bcan");
+								Acan=(double) logWindProfileReturn.get("Acan");
+								Uwrite=(double[]) logWindProfileReturn.get("Uwrite");
+								Twrite=(double[]) logWindProfileReturn.get("Twrite");
+								double Ucanpy=(double) logWindProfileReturn.get("Ucanpy");
+								logWindProfileReturn=null;
+								
 								// Loop throught the patches in the central urban unit and calculate
 								// net radiation, convection at each patch, and solve the energy balance
 								Tp = 0.; Trad_R = 0.; Trad_T = 0.; Trad_N = 0.; Trad_S = 0.; Trad_E = 0.; Trad_W = 0.;
-								httcT = 0.; httcW = 0.; httcR = 0.; Absbs_W = 0.; Absbl_W = 0.; Emit_W = 0.; Qg_T = 0.; Rnet_T = 0.; Qh_T = 0.;
+								httcT = 0.; httcW = 0.; httcR = 0.; 
+								double Absbs_W = 0.; double Absbl_W = 0.; double Emit_W = 0.; 
+								Qg_T = 0.; Rnet_T = 0.; Qh_T = 0.;
 								Qg_N = 0.; Rnet_N = 0.; Qh_N = 0.; Qg_S = 0.; Rnet_S = 0.; Qh_S = 0.;
 								Qg_E = 0.; Rnet_E = 0.; Qh_E = 0.; Qg_W = 0.; Rnet_W = 0.; Qh_W = 0.; Qg_R = 0.;
 								Rnet_R = 0.; Qh_R = 0.; Qg_tot = 0.; Rnet_tot = 0.; Qh_tot = 0.; Qhcantmp = 0.; Qh_abovezH = 0.; Qe_tot = 0.; 
-//								Qecantmp = 0.;
 								Qanthro = 0.;Qac = 0.;Qdeep = 0.;Tsfc_cplt = 0.;Tsfc_bird = 0.;Tsfc_R = 0.;Tsfc_N = 0.;Tsfc_S = 0.;Tsfc_E = 0.;Tsfc_W = 0.;
 								Tsfc_T = 0.;TTsun = 0.;TTsh = 0.;TNsun = 0.;TNsh = 0.;TSsun = 0.;TSsh = 0.;TEsun = 0.;TEsh = 0.;TWsun = 0.;TWsh = 0.;
 								numTsun = 0;numTsh = 0;numNsun = 0;numNsh = 0;numSsun = 0;numSsh = 0;numEsun = 0;numEsh = 0;numWsun = 0;numWsh = 0;Kdn_R = 0.;
 								Kup_R = 0.;Ldn_R = 0.;Lup_R = 0.;Kdn_T = 0.;Kup_T = 0.;Ldn_T = 0.;Lup_T = 0.;Kdn_N = 0.;Kup_N = 0.;Ldn_N = 0.;Lup_N = 0.;
 								Kdn_S = 0.;Kup_S = 0.;Ldn_S = 0.;Lup_S = 0.;Kdn_E = 0.;Kup_E = 0.;Ldn_E = 0.;Lup_E = 0.;Kdn_W = 0.;Kup_W = 0.;Ldn_W = 0.;Lup_W = 0.;
-
-//								iij = 1;
-
+	
 								double Thorz=0;
 								double zhorz=0;
 								double Uhorz=0;
@@ -1694,683 +1204,295 @@ if (Kbeam > 10000)
 								{
 									int iIndex10 = (int) sfc_ab[iabCount][Constants.sfc_ab_i];
 									int y = (int) sfc_ab[iabCount][Constants.sfc_ab_y];
-									int x = (int) sfc_ab[iabCount][Constants.sfc_ab_x];
-								
-									if (sfc[iIndex10][Constants.sfc_surface_type] > 2.5)
+									int x = (int) sfc_ab[iabCount][Constants.sfc_ab_x];							
+									
+									HashMap<String,Double> calcHorzReturn = energyBalances.calcHorz(numsfc2, sfc_ab, sfc, patchlen, zH, z0, zd, ustar,
+												Tcan, Tlog_fact, wstar, Fm, Acan, Bcan, Ccan, rw, zref, httc,
+												press, rhocan, zrooffrc, Lroof, Ta, rhohorz, z0roofm, z0roofh,
+												z0roadm, z0roadh, Tsfc, iIndex10, Thorz, zhorz, Uhorz, iabCount);								
+									httc=calcHorzReturn.get("httc");
+									Thorz=calcHorzReturn.get("Thorz");
+									zhorz=calcHorzReturn.get("zhorz");
+									Uhorz=calcHorzReturn.get("Uhorz");
+									rhohorz=calcHorzReturn.get("rhohorz");
+									calcHorzReturn = null;								
+							
+									// This is actually Kdown-Kup+eps*Ldown (the Lup term is calculated in the iteration below)
+									double Rnet = absbl[iabCount] + absbs[iabCount];
+	
+									double Tconv = Tcan;
+									if ((sfc[iIndex10][Constants.sfc_z] - 0.5) * patchlen + 0.001 >= zH)
 									{
-										double Ueff;
-										double Ucan;
-										// ! WALLS - convection coefficients
-										zwall = (sfc[iIndex10][Constants.sfc_z] - 0.5) * patchlen;
-										if (zwall >= zH)
-										{
-											Ucan = ustar / TUFreg3D.vK * Math.log((zwall - zd) / z0) / Math.sqrt(Fm);
-											Ueff = Math.sqrt(Math.pow(Ucan, 2) + Math.pow(wstar, 2));
-											// ! for Tconv in Newton's method for Tsfc below:
-											Thorz = Tcan - Tlog_fact / Ucan * Math.pow((Math.log((zwall - zH + z0) / z0)), 2);
-										}
-										else
-										{
-											Ucan = Acan + Bcan * Math.exp(Ccan * zwall);
-											Ueff = Math.sqrt(Math.pow(Ucan, 2) + Math.pow(wstar, 2));
-										}
-										httc = rw * (11.8 + 4.2 * Ueff) - 4.;
+										Tconv = Thorz;
 									}
-									else
-									{										
-										// ! STREETS & ROOFS - convection coefficients
-										// ! use the windspeed 0.5*patchlen above the surface (changed to Harman:
-										// ! 0.1*average roof length)
-
-										// ! streets:
-										zhorz = 0.1 * zH;
-
-										// ! roofs:
-										if (sfc[iIndex10][Constants.sfc_surface_type] < 1.5)
-										{
-											zhorz = Math.min(zref, (sfc[iIndex10][Constants.sfc_z] - 0.5 + 0.1 * Lroof) * patchlen);											
-											if (zrooffrc > 0.)
+	
+									if (Math.abs(Tsfc[iabCount] - Tconv) > 60.)
+									{
+									}
+									if (Rnet>3000.0 || Rnet<-500.0) 
+									{
+										System.out.println("Rnet is too big, Rnet = " + Rnet);
+	
+									}
+									// ITERATION to solve individual patch Tsfc[i] by Newton's method----
+									HashMap solvePatchReturn = energyBalances.solvePatchTsfcNewton(iabCount, Tsfc, sfc, iIndex10, httc, Rnet, Tconv,
+											sfc_ab, sixPlusThreeTimesNumlayers, lambda_sfc, Tdiffmax, refltl, Trad);
+									Tdiffmax=(double) solvePatchReturn.get("Tdiffmax");
+									httc=(double) solvePatchReturn.get("httc");
+									Tsfc=(double[]) solvePatchReturn.get("Tsfc");
+									Trad=(double[]) solvePatchReturn.get("Trad");
+									solvePatchReturn = null;								
+		
+									// ! STORE OUTPUT: (only the chosen subdomain)
+									if (sfc[iIndex10][Constants.sfc_in_array] > 1.5)
+									{
+										// overall energy balance (per unit plan area):
+										// !print *,sfc_ab_map_x[iab],sfc_ab_map_y[iab],sfc_ab_map_z[iab],sfc_ab_map_f[iab],timeis,yd_actual
+										leFromEt5 = 0;
+	
+										diffShadingValueUsed = Constants.DIFFERENTIALSHADING100PERCENT;
+										if (Ktot > 1.0E-3)
+										{									
+											diffShadingCalculatedValue = treeXYMapSunlightPercentageTotal[sfc_ab_map_x[iabCount]-1][sfc_ab_map_y[iabCount]-1];
+											if (diffShadingCalculatedValue >= .50)
 											{
-												zhorz = Math.min(zref, (sfc[iIndex10][Constants.sfc_z] - 0.5) * patchlen + zrooffrc);
+												diffShadingValueUsed = Constants.DIFFERENTIALSHADING100PERCENT;
+												outputDebugStr = "100%";
+											}
+											if (diffShadingCalculatedValue < .50)
+											{
+												diffShadingValueUsed = DIFFERENTIALSHADINGDIFFUSE;
+												outputDebugStr = "0%";
 											}
 										}
-
-										// ! assume wstar is not relevant for roofs above zH
-										if (zhorz > zH)
-										{
-											Uhorz = ustar / TUFreg3D.vK * Math.log((zhorz - zd) / z0) / Math.sqrt(Fm);
-											Thorz = Tcan - Tlog_fact / Uhorz * Math.pow((Math.log((zhorz - zH + z0) / z0)), 2);
-											rhohorz = press * 100. / 287.04 / Thorz;
-
-											if (Math.max(Math.abs(Thorz - Tcan), Math.abs(Thorz - Ta)) > Math.abs(Tcan - Ta) + 0.01)
-											{
-												System.out.println("Thorz outside of Ta,Tcan range, Thorz,i=" + " " + Thorz + " " + iIndex10);
-												System.exit(1);
-											}
-										}
-										else
-										{
-											// ! effective canyon wind is only for HTC calc, not Ri calc too!
-											Uhorz = Acan + Bcan * Math.exp(Ccan * zhorz);
-											Thorz = Tcan;
-											rhohorz = rhocan;
-										}
-									if (sfc[iIndex10][Constants.sfc_surface_type] < 1.5)
-									{
-//										double aaaa;
-										// ! roofs:
-										// ! Harman et al. 2004 approach: 0.1*average roof length
-										Ri = util.SFC_RI(zhorz - (sfc[iIndex10][Constants.sfc_z] - 0.5) * patchlen, Thorz, Tsfc[iabCount], Uhorz);
-										if ((sfc[iIndex10][Constants.sfc_z] - 0.5) * patchlen < zH - 0.01)
-										{
-											HashMap<String, Double> htcReturn2 = util.HTC(Ri,
-													Math.sqrt(Math.pow(Uhorz, 2) + Math.pow(wstar, 2)),
-													zhorz - (sfc[iIndex10][Constants.sfc_z] - 0.5) * patchlen, z0roofm, z0roofh);
-											httc = htcReturn2.get(VTUF3DUtil.HTTC_OUT_INDEX);
-											Fh = htcReturn2.get(VTUF3DUtil.FH_INDEX);
-//											aaaa = 1.;
-										}
-										else
-										{
-											HashMap<String, Double> htcReturn3 = 
-													util.HTC(Ri, Uhorz, zhorz - (sfc[iIndex10][Constants.sfc_z] - 0.5) * patchlen, 
-															z0roofm, z0roofh);
-											httc = htcReturn3.get(VTUF3DUtil.HTTC_OUT_INDEX);
-											Fh = htcReturn3.get(VTUF3DUtil.FH_INDEX);
-//											aaaa = 2.;
-										}
-									}
-									else
-									{
-										// streets: Harman et al. 2004 approach:  0.1*average building height
-										Ri = util.SFC_RI(0.1 * zH, Thorz, Tsfc[iabCount], Uhorz);
-										HashMap<String, Double> htcReturn4 = util.HTC(Ri,
-												Math.sqrt(Math.pow(Uhorz, 2) + Math.pow(wstar, 2)), 0.1 * zH, z0roadm,
-												z0roadh);
-										httc = htcReturn4.get(VTUF3DUtil.HTTC_OUT_INDEX);
-										Fh = htcReturn4.get(VTUF3DUtil.FH_INDEX);
-									}
-									httc = httc * TUFreg3D.cpair * rhohorz;
-								}
-
-								// This is actually Kdown-Kup+eps*Ldown (the Lup term is calculated in the iteration below)
-								Rnet = absbl[iabCount] + absbs[iabCount];
-//if (iabCount ==0) System.out.println("Rnet1 " + Rnet + " " + absbl[iabCount] +" " + absbs[iabCount]);
-
-								Tconv = Tcan;
-								//adding to initialize i (replaced all the i with iIndex
-
-								if ((sfc[iIndex10][Constants.sfc_z] - 0.5) * patchlen + 0.001 >= zH)
-								{
-									Tconv = Thorz;
-								}
-
-								if (Math.abs(Tsfc[iabCount] - Tconv) > 60.)
-								{
-//									System.out.println("iab,Tsfc[iab],Tconv" + " " + iabCount + " " + Tsfc[iabCount] + " " + Tconv);
-									// write(6,*)"iab,Tsfc[iab],Tconv",iab,Tsfc[iab],Tconv;
-									// stop
-//									System.exit(1);
-								}
-								if (Rnet>3000.0 || Rnet<-500.0) 
-								{
-									System.out.println("Rnet is too big, Rnet = " + Rnet);
-//									System.out.println("Problem is at patch x,y,z,f =" + sfc[iIndex10][Constants.sfc_evf]
-//											+ " " + sfc[iIndex10][Constants.sfc_emiss]
-//											+ " " + sfc[iIndex10][Constants.sfc_albedo]
-//											+ " " + sfc[iIndex10][Constants.sfc_sunlight_fact]);
-									
-//									System.out.println(iabCount + " " + sfc[iIndex10][Constants.sfc_albedo] + " " + Kbeam + " " + " " + sfc[iIndex10][Constants.sfc_sunlight_fact] );									
-
-//									absbs[iabCount] = absbs[iabCount] + (1. - sfc[iIndex6][Constants.sfc_albedo])
-//											* Kbeam * Math.cos((g)) * sfc[iIndex6][Constants.sfc_sunlight_fact] / 4.;
-									
-									
-//									System.out.println(absbl[iabCount] +" "+ absbs[iabCount]);
-//									System.exit(1);
-								}
-								// KN, changing this to let Rnet be a little
-								// bigger
-								// ! write(6,*)'Rnet is too big, Rnet = ',Rnet
-								// ! write(6,*)'Problem is at patch x,y,z,f =
-								// ',sfc[i][Constants.sfc_evf],sfc[i][Constants.sfc_emiss],sfc[i][Constants.sfc_albedo],sfc[i][Constants.sfc_sunlight_fact]
-								// !endif
-								// !if (Rnet>2000.0.or.Rnet<-1000.0) then
-								// ! write(6,*)'Rnet is too big, Rnet = ',Rnet
-								// ! write(6,*)'Problem is at patch x,y,z,f =
-								// ',sfc[i][Constants.sfc_evf],sfc[i][Constants.sfc_emiss],sfc[i][Constants.sfc_albedo],sfc[i][Constants.sfc_sunlight_fact]
-								// !endif
-
-								// ! stop
-
-								Tnew = Tsfc[iabCount];
-
-								Told = Tnew + 999.;
-//System.out.println("++++++++++++++++++++++++start Tsfc newton=" + (System.currentTimeMillis() - TUFreg3D.startTime)/1000./60. );	
-								// ITERATION to solve individual patch Tsfc[i] by Newton's method----
-								int patchItrCount = 0;
-								int httcRetries = 0;
-								while (Math.abs(Tnew - Told) > 0.001)
-								{
-//									if (iabCount == 399 || iabCount == 398)
-//									{
-//										System.out.println(	 "|  " + iabCount + " " + 	
-//											Told+ " "+
-//											httc + " "+
-//											Rnet + " "+
-//											Tconv+ " "+
-//											sfc_ab[iabCount][Constants.sfc_ab_layer_temp] 									
-//										);
-//										System.out.println("||| " + sfc[iIndex10][Constants.sfc_emiss] + " " +
-//												sigma + " " + 
-//												lambda_sfc[iabCount] + " " + 
-//												sfc_ab[iabCount][sixPlusThreeTimesNumlayers] + " " + 
-//												Tnew
-//														);
-//									}
-									Told = Tnew;
-									Fold = sfc[iIndex10][Constants.sfc_emiss] * TUFreg3D.sigma * Math.pow(Told, 4)
-											+ (httc + lambda_sfc[iabCount] * 2. / sfc_ab[iabCount][sixPlusThreeTimesNumlayers]) * Told - Rnet - httc * Tconv
-											- lambda_sfc[iabCount] * sfc_ab[iabCount][Constants.sfc_ab_layer_temp] * 2. / sfc_ab[iabCount][sixPlusThreeTimesNumlayers];
-									Fold_prime = 4. * sfc[iIndex10][Constants.sfc_emiss] * TUFreg3D.sigma * Math.pow(Told, 3) + httc
-											+ lambda_sfc[iabCount] * 2. / sfc_ab[iabCount][sixPlusThreeTimesNumlayers];
-									Tnew = -Fold / Fold_prime + Told;
-									if (Double.isNaN(Tnew))
-									{
-										System.out.println();
-									}
-//									System.out.println(patchItrCount + " " + Tnew + " " + Told + " " + Fold + " " + Fold_prime);
-									//  fails with 0 200.50485379623788 291.15 255.04996909525653 2.813718988570301
-									patchItrCount++;
-									if (patchItrCount > 40)
-									{
-										System.out.println("too many iterations in Tsfc");
-										System.out.println("modifying httc " + httc );
-										if (httc < 0)
-										{
-											httc = httc + 0.5;
-										}
-										else
-										{
-											httc = httc - 0.5;
-										}
-										patchItrCount = 0;
-										if (httcRetries > 10)
-										{
-											System.out.println("Too many httc retries");
-											
-											System.out.println(	 "|  " + iabCount + " " + 	
-											Told+ " "+
-											httc + " "+
-											Rnet + " "+
-											Tconv+ " "+
-											sfc_ab[iabCount][Constants.sfc_ab_layer_temp] 									
-										);
-										System.out.println("||| " + sfc[iIndex10][Constants.sfc_emiss] + " " +
-												TUFreg3D.sigma + " " + 
-												lambda_sfc[iabCount] + " " + 
-												sfc_ab[iabCount][sixPlusThreeTimesNumlayers] + " " + 
-												Tnew
-														);
-										System.out.println(patchItrCount + " " + Tnew + " " + Told + " " + Fold + " " + Fold_prime);
-											
-											System.exit(1);
-										}
-										httcRetries ++;
-									}
-									
-									// 899 continue
-								}
-								if (Math.abs(Tnew - Tsfc[iabCount]) > Tdiffmax)
-								{
-									Tdiffmax = Math.abs(Tnew - Tsfc[iabCount]);
-								}
-								if (Double.isNaN(Tnew))
-								{
-									System.out.println();
-								}
-								Tsfc[iabCount] = Tnew;
-
-								Trad[iabCount] = Math.pow(((1. / TUFreg3D.sigma)
-										* (sfc[iIndex10][Constants.sfc_emiss] * TUFreg3D.sigma * Math.pow(Tsfc[iabCount], 4) + refltl[iabCount])),
-										(0.25));
-
-								// ! STORE OUTPUT: (only the chosen subdomain)
-								if (sfc[iIndex10][Constants.sfc_in_array] > 1.5)
-								{
-									// overall energy balance (per unit plan area):
-									// !print *,sfc_ab_map_x[iab],sfc_ab_map_y[iab],sfc_ab_map_z[iab],sfc_ab_map_f[iab],timeis,yd_actual
-									leFromEt5 = 0;
-
-									diffShadingValueUsed = Constants.DIFFERENTIALSHADING100PERCENT;
-									if (Ktot > 1.0E-3)
-									{									
-										diffShadingCalculatedValue = treeXYMapSunlightPercentageTotal[sfc_ab_map_x[iabCount]-1][sfc_ab_map_y[iabCount]-1];
-										if (diffShadingCalculatedValue >= .50)
+	
+										if (treeMapFromConfig.usingDiffShading == 0)
 										{
 											diffShadingValueUsed = Constants.DIFFERENTIALSHADING100PERCENT;
-											outputDebugStr = "100%";
+											// stop;
+											System.exit(1);
 										}
-										if (diffShadingCalculatedValue < .50)
-										{
-											diffShadingValueUsed = DIFFERENTIALSHADINGDIFFUSE;
-											outputDebugStr = "0%";
-										}
-									}
-
-									if (treeMapFromConfig.usingDiffShading == 0)
-									{
-										diffShadingValueUsed = Constants.DIFFERENTIALSHADING100PERCENT;
-										// stop;
-										System.exit(1);
-									}
-
-									if (treeXYMap[sfc_ab_map_x[iabCount]-1][sfc_ab_map_y[iabCount]-1] != 0)
-									{
-										// ! print
-										// *,'----------------------------------------'
-										tempTimeis = (int) (timeis * 2);
-										if (tempTimeis < 1)
-										{
-											tempTimeis = 1;
-										}
-
-										//TODO figure out how to replace this with online Maespa
-										String key = treeXYMap[sfc_ab_map_x[iabCount]-1][sfc_ab_map_y[iabCount]-1] + "_" + diffShadingValueUsed;
-										Tsfc[iabCount] = maespaDataArray.get(key).get(tempTimeis-1).getTCAN() + 273.15;
-										if (Double.isNaN(Tsfc[iabCount]))
-										{
-											System.out.println();
-										}
-										// only use LE from the trunk grid square
-										if (treeXYTreeMap[sfc_ab_map_x[iabCount]-1][sfc_ab_map_y[iabCount]-1] > 0) 
-										{
-											//TODO figure out how to replace this with online Maespa
-											leFromEt5 = maespaDataArray.get(key).get(tempTimeis-1).getQeCalc5() ;
-											System.out.println("le=" + leFromEt5 + " " + simpelQe);
-										}
-									}
-									
-					               
-
-									if (treeXYTreeMap[sfc_ab_map_x[iabCount]-1][sfc_ab_map_y[iabCount]-1] > 0)
-									{
-//										 // run Simpel for the timestep
-//						        		HashMap<Integer,Double> simpelMetInput = new HashMap<Integer,Double>();
-////						        		String[] InputStr = new String[] {"20.1.2021.0","20","0","63.7493333333333","13.49","0.255833333333333","0","0"};
-//						        		simpelMetInput.put(SimpelConstants.INPUT_P, 0.); //TODO, no precipitation in forcing data yet
-//						        		simpelMetInput.put(SimpelConstants.INPUT_T14, Ta);
-//						        								        		
-//						        		double calcRH = common.CalculateRHFromVapor(Ta, ea);
-//						        		
-//						        		simpelMetInput.put(SimpelConstants.INPUT_R14, calcRH);		
-//						        		simpelMetInput.put(SimpelConstants.INPUT_K_DOWN, Ktotfrc);
-//						        								        	   
-//						        		long month = Math.round(yd_actual/30.);//TODO set the actual month
-//						        		simpelMetInput.put(SimpelConstants.INPUT_DOY, yd_actual*1.0);
-//						        		simpelMetInput.put(SimpelConstants.INPUT_MONTH, month*1.0);
-//						        		simpelMetInput.put(SimpelConstants.INPUT_HOUR, TM*1.0);
-//						        		
-////						        		System.out.println("inputhour "+common.roundTwoDecimals(TM));
-//						        		if (simpelMetInput.get(SimpelConstants.INPUT_HOUR) == 13) //TODO, set from property file, what time, how much irrigation
-//						        		{
-//						        			simpelMetInput.put(SimpelConstants.INPUT_IRR, 4.0);
-//						        		}
-//						        								        		
-//						        		//ok if this is null for the first time, will be filled in the timestep function
-//						        		TreeMap<Integer,Double> simpelPreviousTimestepValues = allSimpelPreviousTimesteps.get(iabCount);
-//						        		
-//						        		ETo eto = new ETo();						        		
-////						        		The latitude of the met station (dec deg) 
-//						        		double lat=-37.5;
-////						        		The longitude of the met station (dec deg) (only needed if calculating ETo hourly)
-//						        		double lon=145;
-////						        		The longitude of the center of the time zone (dec deg) (only needed if calculating ETo hourly).
-//						        		double TZ_lon=145;
-////						        		Elevation of the met station above mean sea level (m) 
-//						        		double z_msl=500;
-////						        		The height of the wind speed measurement (m). Default is 2 m.
-//						        		double z_u=2;
-////						        		Wind speed at height z (m/s), set to NaN to calculate
-//						        		double U_z=Double.NaN;
-////						        		Albedo. Should be 0.23 for the reference crop.
-//						        		double alb = 0.23;
-////						        		Day of Year
-//						        		int Day = yd_actual;		
-////						        		Time frequency string of the input and output. The minimum frequency is hours (H) and the maximum is month (M).
-//						        		int freq=ETo.HOURLY;
-////						        		Time of day
-//						        		int hour = (int) Math.round(TM);		
-////						        		Incoming shortwave radiation (MJ/m2)
-//						        		double R_s_hourly = Ktotfrc * 60. * 60. * 1E-6;  
-////						        		Actual Vapour pressure derrived from RH
-//						        		double e_a_hourly = ea;  
-////						        		Mean Temperature (deg C)
-//						        		double T_mean_hourly = Ta;
-//						        		// if no incoming shortwave, then nighttime
-//						        		boolean daytime = true;
-//						        		if (Ktotfrc < 50)
-//						        		{
-//						        			daytime = false;
-//						        		}
-//						        		
-//						        		double etoValue = eto.eto_fao_hourly(freq, lat, Day, lon, TZ_lon, z_msl, e_a_hourly, R_s_hourly, T_mean_hourly, z_u, U_z, alb, hour, daytime);
-//
-//						        		double[][] simpelReturnValues = simpel.SIMPLE_function(simpelMetInput, SimpelConstants.Landuse, SimpelConstants.LAI_model, 
-//						        														SimpelConstants.Soil, simpelPreviousTimestepValues, etoValue);    		
-//						        		simpelPreviousTimestepValues = simpel.setPreviousValues(simpelReturnValues);
-//						        		allSimpelPreviousTimesteps.put(iabCount,simpelPreviousTimestepValues);
-//						        		
-//						        		double simpelETA = simpelReturnValues[0][SimpelConstants.ETA_TOTAL];
-//						        		double simpelQe = simpel.qeFromETA2(simpelETA);
-//						        		System.out.println("eto "+ common.roundTwoDecimals(etoValue) + " " +  common.roundTwoDecimals(simpelETA )+ " " + common.roundTwoDecimals(simpelQe)) ;
-////						        		System.out.println("eto "+ common.roundTwoDecimals(etoValue) + " " +  common.roundTwoDecimals(simpelETA )+ " " + (simpelQe)) ;
-//						        		
-////						        		simpelQe=0;	    						        		
-//						        		// end Simpel	
+	
+										HashMap energyBalanceForVegetationReturn = energyBalances.energyBalanceForVegetation(treeXYMap, sfc_ab_map_x, sfc_ab_map_y, iabCount, timeis, diffShadingValueUsed,
+												Tsfc, maespaDataArray, treeXYTreeMap, leFromEt5, simpelQe, sfc, sfc_ab, iIndex10, patchlen, zH, Rnet, httc, Tconv,
+												 currentRnet, currentQh, currentQe, currentQg, Rnet_tot, Qh_tot, Qe_tot, Qg_tot, sixPlusThreeTimesNumlayers, lambda_sfc);
 										
-						        		if ((sfc[iIndex10][Constants.sfc_z] - 0.5) * patchlen < zH - 0.01)
+										currentRnet=(double[]) energyBalanceForVegetationReturn.get("currentRnet");
+										currentQh=(double[]) energyBalanceForVegetationReturn.get("currentQh");
+										currentQe=(double[]) energyBalanceForVegetationReturn.get("currentQe");
+										currentQg=(double[]) energyBalanceForVegetationReturn.get("currentQg");
+										Tsfc=(double[]) energyBalanceForVegetationReturn.get("Tsfc");
+										Rnet_tot=(double) energyBalanceForVegetationReturn.get("Rnet_tot");
+										Qh_tot=(double) energyBalanceForVegetationReturn.get("Qh_tot");
+										Qe_tot=(double) energyBalanceForVegetationReturn.get("Qe_tot");
+										Qg_tot=(double) energyBalanceForVegetationReturn.get("Qg_tot");
+										leFromEt5=(double) energyBalanceForVegetationReturn.get("leFromEt5");
+										simpelQe=(double) energyBalanceForVegetationReturn.get("simpelQe");
+
+										// ! canyon only:
+										if ((sfc[iIndex10][Constants.sfc_z] - 0.5) * patchlen < zH - 0.01)
 										{
-//						        			System.out.println("canyon");
-//						        			System.out.println("simpel="+common.roundTwoDecimals(simpelQe) + " " + "maespa=" + common.roundTwoDecimals(leFromEt5));
+											Qhcantmp = Qhcantmp + httc * (Tsfc[iabCount] - Tconv);
+										}
+										else
+										{
+											Qh_abovezH = Qh_abovezH + httc * (Tsfc[iabCount] - Tconv);
+										}
+	
+										// for evolution of internal building temperature:
+										if (sfc[iIndex10][Constants.sfc_surface_type] > 2.5)
+										{
+											// wall internal T
+											Tp = Tp + sfc_ab[iabCount][fivePlusNumlayers];
+										}
+										else if (sfc[iIndex10][Constants.sfc_surface_type] < 1.5)
+										{
+											// ! roof internal T; also add internal of floor (user-defined)
+											Tp = Tp + sfc_ab[iabCount][fivePlusNumlayers] + Tfloor;
+										}
+	
+										// ! Surface temperatures and energy balance components.
+										//  Averaging patch values to get facet-average values
+										//  complete (per unit total area)
+										Tsfc_cplt = Tsfc_cplt + Tsfc[iabCount];
+										//  bird's eye view sfc T
+										if (sfc[iIndex10][Constants.sfc_surface_type] < 2.5)
+										{
+											Tsfc_bird = Tsfc_bird + Tsfc[iabCount];
 										}
 										
-										
-																		
-										// this rnet value would have been calculated using the vegetation alb/emis
-										currentRnet[iabCount] = Rnet - sfc[iIndex10][Constants.sfc_emiss] * TUFreg3D.sigma * Math.pow(Tsfc[iabCount], 4);
-
-										currentQh[iabCount] = (httc * (Tsfc[iabCount] - Tconv))- leFromEt5;
-										currentQe[iabCount] = leFromEt5;
-										currentQg[iabCount] = (Rnet - sfc[iIndex10][Constants.sfc_emiss] * TUFreg3D.sigma * Math.pow(Tsfc[iabCount], 4))
-												- (httc * (Tsfc[iabCount] - Tconv)) ;
-
-										Rnet_tot = Rnet_tot + currentRnet[iabCount];
-										Qh_tot = Qh_tot + currentQh[iabCount];
-										Qe_tot = Qe_tot + currentQe[iabCount];
-										// !! calculate Qg as a residual from
-										// rnet
-										Qg_tot = Qg_tot + currentQg[iabCount];
-									}
-				
-									if (treeXYTreeMap[sfc_ab_map_x[iabCount]-1][sfc_ab_map_y[iabCount]-1] > 0)
-									{
-//										continue;
-										// this isn't a Maespa surface then, so use the normal TUF method
-									}
-									else
-									{											
-										currentRnet[iabCount] = Rnet - sfc[iIndex10][Constants.sfc_emiss] * TUFreg3D.sigma * Math.pow(Tsfc[iabCount], 4);
-										currentQe[iabCount] = leFromEt5;
-
-										currentQh[iabCount] = (httc * (Tsfc[iabCount] - Tconv));										
-										currentQg[iabCount] = (lambda_sfc[iabCount] * (Tsfc[iabCount] - sfc_ab[iabCount][Constants.sfc_ab_layer_temp]) * 2.
-												/ sfc_ab[iabCount][sixPlusThreeTimesNumlayers]);
-										Rnet_tot = Rnet_tot + currentRnet[iabCount];
-										Qh_tot = Qh_tot + currentQh[iabCount];
-										Qe_tot = Qe_tot + currentQe[iabCount];
-										Qg_tot = Qg_tot + currentQg[iabCount];
-									}
-									// ! canyon only:
-									if ((sfc[iIndex10][Constants.sfc_z] - 0.5) * patchlen < zH - 0.01)
-									{
-										Qhcantmp = Qhcantmp + httc * (Tsfc[iabCount] - Tconv);
-									}
-									else
-									{
-										Qh_abovezH = Qh_abovezH + httc * (Tsfc[iabCount] - Tconv);
-									}
-
-									// for evolution of internal building temperature:
-									if (sfc[iIndex10][Constants.sfc_surface_type] > 2.5)
-									{
-										// wall internal T
-										Tp = Tp + sfc_ab[iabCount][fivePlusNumlayers];
-									}
-									else if (sfc[iIndex10][Constants.sfc_surface_type] < 1.5)
-									{
-										// ! roof internal T; also add internal of floor (user-defined)
-										Tp = Tp + sfc_ab[iabCount][fivePlusNumlayers] + Tfloor;
-									}
-
-									// ! Surface temperatures and energy balance components.
-									//  Averaging patch values to get facet-average values
-									//  complete (per unit total area)
-									Tsfc_cplt = Tsfc_cplt + Tsfc[iabCount];
-									//  bird's eye view sfc T
-									if (sfc[iIndex10][Constants.sfc_surface_type] < 2.5)
-									{
-										Tsfc_bird = Tsfc_bird + Tsfc[iabCount];
-									}
-									
-									//  roof sfc T and energy balance
-									if (sfc[iIndex10][Constants.sfc_surface_type] < 1.5)
-									{
-										double[] roofEnergyBalanceReturn = energyBalances.energyBalance(httc, iabCount, iIndex10, sixPlusThreeTimesNumlayers, 
-												fivePlusNumlayers, numlayersMinus1,
-												Tsfc, sfc, refltl, tots, reflts, lambda_sfc, lambdaavr, thickr, sfc_ab,  totl, Rnet, Tconv, Tintw,
-												httcR, Tsfc_R, Trad_R,  Rnet_R, Kdn_R, Kup_R, Ldn_R, Lup_R, Qh_R, Qg_R, Qanthro, Qac);
-//										httcR = httcR + httc;
-//										Tsfc_R = Tsfc_R + Tsfc[iabCount];
-//										Trad_R = Trad_R + Math.pow(((1. / sigma)
-//												* (sfc[iIndex10][Constants.sfc_emiss] * sigma * Math.pow(Tsfc[iabCount], 4)
-//														+ refltl[iabCount])),
-//												(0.25));
-//										Rnet_R = Rnet_R + Rnet
-//												- sfc[iIndex10][Constants.sfc_emiss] * sigma * Math.pow(Tsfc[iabCount], 4);
-//										Kdn_R = Kdn_R + tots[iabCount];
-//										Kup_R = Kup_R + reflts[iabCount];
-//										Ldn_R = Ldn_R + totl[iabCount];
-//										Lup_R = Lup_R + refltl[iabCount]
-//												+ sfc[iIndex10][Constants.sfc_emiss] * sigma * Math.pow(Tsfc[iabCount], 4);
-//
-//										Qh_R = Qh_R + httc * (Tsfc[iabCount] - Tconv);
-//
-//										Qg_R = Qg_R + lambda_sfc[iabCount]
-//												* (Tsfc[iabCount] - sfc_ab[iabCount][Constants.sfc_ab_layer_temp]) * 2.
-//												/ sfc_ab[iabCount][sixPlusThreeTimesNumlayers];
-//										Qanthro = Qanthro + Math.max(0., (Tintw - sfc_ab[iabCount][fivePlusNumlayers])
-//												* lambdaavr[numlayersMinus1] * 2. / thickr[numlayersMinus1]);
-//										Qac = Qac + Math.max(0., (sfc_ab[iabCount][fivePlusNumlayers] - Tintw)
-//												* lambdaavr[numlayersMinus1] * 2. / thickr[numlayersMinus1]);
-										
-										httcR = roofEnergyBalanceReturn[0];
-										Tsfc_R = roofEnergyBalanceReturn[1];
-										Trad_R = roofEnergyBalanceReturn[2];
-										Rnet_R = roofEnergyBalanceReturn[3];
-										Kdn_R = roofEnergyBalanceReturn[4];
-										Kup_R = roofEnergyBalanceReturn[5];
-										Ldn_R = roofEnergyBalanceReturn[6];
-										Lup_R = roofEnergyBalanceReturn[7];
-										Qh_R = roofEnergyBalanceReturn[8];
-										Qg_R = roofEnergyBalanceReturn[9];
-										Qanthro = roofEnergyBalanceReturn[10];
-										Qac = roofEnergyBalanceReturn[11];
-									}
-
-									//  street energy balance (sfc T calc below)
-									if (sfc[iIndex10][Constants.sfc_surface_type] > 1.5
-											&& sfc[iIndex10][Constants.sfc_surface_type] < 2.5)
-									{
-
-										httcT = httcT + httc;
-										Trad_T = Trad_T + Math.pow(((1. / TUFreg3D.sigma)
-												* (sfc[iIndex10][Constants.sfc_emiss] * TUFreg3D.sigma * Math.pow(Tsfc[iabCount], 4)
-														+ refltl[iabCount])),
-												(0.25));
-								
-										Rnet_T = Rnet_T + Rnet
-												- sfc[iIndex10][Constants.sfc_emiss] * TUFreg3D.sigma * Math.pow(Tsfc[iabCount], 4);
-										Kdn_T = Kdn_T + tots[iabCount];
-										Kup_T = Kup_T + reflts[iabCount];
-										Ldn_T = Ldn_T + totl[iabCount];
-										Lup_T = Lup_T + refltl[iabCount]
-												+ sfc[iIndex10][Constants.sfc_emiss] * TUFreg3D.sigma * Math.pow(Tsfc[iabCount], 4);
-										Qh_T = Qh_T + httc * (Tsfc[iabCount] - Tconv);
-
-										Qg_T = Qg_T + lambda_sfc[iabCount]
-												* (Tsfc[iabCount] - sfc_ab[iabCount][Constants.sfc_ab_layer_temp]) * 2.
-												/ sfc_ab[iabCount][sixPlusThreeTimesNumlayers];
-										Qdeep = Qdeep + (sfc_ab[iabCount][fivePlusNumlayers] - Tints) * lambdaavs[numlayersMinus1] * 2.
-												/ thicks[numlayersMinus1];
-										
-										if (sfc[iIndex10][Constants.sfc_sunlight_fact] > 3.5)
+										//  roof sfc T and energy balance
+										if (sfc[iIndex10][Constants.sfc_surface_type] < 1.5)
 										{
-											TTsun = TTsun + Tsfc[iabCount];
-											numTsun = numTsun + 1;
+											HashMap<String,Double> energyBalanceReturn = energyBalances.energyBalance(httc, iabCount, iIndex10, sixPlusThreeTimesNumlayers, 
+													fivePlusNumlayers, numlayersMinus1,
+													Tsfc, sfc, refltl, tots, reflts, lambda_sfc, lambdaavr, thickr, sfc_ab,  totl, Rnet, Tconv, Tintw,
+													httcR, Tsfc_R, Trad_R,  Rnet_R, Kdn_R, Kup_R, Ldn_R, Lup_R, Qh_R, Qg_R, Qanthro, Qac);
+	//										httcR = httcR + httc;
+	//										Tsfc_R = Tsfc_R + Tsfc[iabCount];
+	//										Trad_R = Trad_R + Math.pow(((1. / sigma)
+	//												* (sfc[iIndex10][Constants.sfc_emiss] * sigma * Math.pow(Tsfc[iabCount], 4)
+	//														+ refltl[iabCount])),
+	//												(0.25));
+	//										Rnet_R = Rnet_R + Rnet
+	//												- sfc[iIndex10][Constants.sfc_emiss] * sigma * Math.pow(Tsfc[iabCount], 4);
+	//										Kdn_R = Kdn_R + tots[iabCount];
+	//										Kup_R = Kup_R + reflts[iabCount];
+	//										Ldn_R = Ldn_R + totl[iabCount];
+	//										Lup_R = Lup_R + refltl[iabCount]
+	//												+ sfc[iIndex10][Constants.sfc_emiss] * sigma * Math.pow(Tsfc[iabCount], 4);
+	//
+	//										Qh_R = Qh_R + httc * (Tsfc[iabCount] - Tconv);
+	//
+	//										Qg_R = Qg_R + lambda_sfc[iabCount]
+	//												* (Tsfc[iabCount] - sfc_ab[iabCount][Constants.sfc_ab_layer_temp]) * 2.
+	//												/ sfc_ab[iabCount][sixPlusThreeTimesNumlayers];
+	//										Qanthro = Qanthro + Math.max(0., (Tintw - sfc_ab[iabCount][fivePlusNumlayers])
+	//												* lambdaavr[numlayersMinus1] * 2. / thickr[numlayersMinus1]);
+	//										Qac = Qac + Math.max(0., (sfc_ab[iabCount][fivePlusNumlayers] - Tintw)
+	//												* lambdaavr[numlayersMinus1] * 2. / thickr[numlayersMinus1]);
+																	
+											httcR=energyBalanceReturn.get("httcR");
+											Tsfc_R=energyBalanceReturn.get("Tsfc_R");
+											Trad_R=energyBalanceReturn.get("Trad_R");
+											Rnet_R=energyBalanceReturn.get("Rnet_R");
+											Kdn_R=energyBalanceReturn.get("Kdn_R");
+											Kup_R=energyBalanceReturn.get("Kup_R");
+											Ldn_R=energyBalanceReturn.get("Ldn_R");
+											Lup_R=energyBalanceReturn.get("Lup_R");
+											Qh_R=energyBalanceReturn.get("Qh_R");
+											Qh_R=energyBalanceReturn.get("Qh_R");
+											Qg_R=energyBalanceReturn.get("Qg_R");
+											Qanthro=energyBalanceReturn.get("Qanthro");
+											Qac=energyBalanceReturn.get("Qac");
 										}
-										else if (sfc[iIndex10][Constants.sfc_sunlight_fact] < 0.5)
+	
+										//  street energy balance (sfc T calc below)
+										if (sfc[iIndex10][Constants.sfc_surface_type] > 1.5
+												&& sfc[iIndex10][Constants.sfc_surface_type] < 2.5)
 										{
-											TTsh = TTsh + Tsfc[iabCount];
-											numTsh = numTsh + 1;
+	
+											httcT = httcT + httc;
+											Trad_T = Trad_T + Math.pow(((1. / TUFreg3D.sigma) * (sfc[iIndex10][Constants.sfc_emiss] * TUFreg3D.sigma * Math.pow(Tsfc[iabCount], 4)
+															+ refltl[iabCount])),(0.25));									
+											Rnet_T = Rnet_T + Rnet - sfc[iIndex10][Constants.sfc_emiss] * TUFreg3D.sigma * Math.pow(Tsfc[iabCount], 4);
+											Kdn_T = Kdn_T + tots[iabCount];
+											Kup_T = Kup_T + reflts[iabCount];
+											Ldn_T = Ldn_T + totl[iabCount];
+											Lup_T = Lup_T + refltl[iabCount] + sfc[iIndex10][Constants.sfc_emiss] * TUFreg3D.sigma * Math.pow(Tsfc[iabCount], 4);
+											Qh_T = Qh_T + httc * (Tsfc[iabCount] - Tconv);	
+											Qg_T = Qg_T + lambda_sfc[iabCount] * (Tsfc[iabCount] - sfc_ab[iabCount][Constants.sfc_ab_layer_temp]) * 2.
+													/ sfc_ab[iabCount][sixPlusThreeTimesNumlayers];
+											Qdeep = Qdeep + (sfc_ab[iabCount][fivePlusNumlayers] - Tints) * lambdaavs[numlayersMinus1] * 2. / thicks[numlayersMinus1];
+											
+											if (sfc[iIndex10][Constants.sfc_sunlight_fact] > 3.5)
+											{
+												TTsun = TTsun + Tsfc[iabCount];
+												numTsun = numTsun + 1;
+											}
+											else if (sfc[iIndex10][Constants.sfc_sunlight_fact] < 0.5)
+											{
+												TTsh = TTsh + Tsfc[iabCount];
+												numTsh = numTsh + 1;
+											}
 										}
-									}
-									if (sfc[iIndex10][Constants.sfc_surface_type] > 2.5)
-									{
-										httcW = httcW + httc;
-									}
-									//  N wall sfc T and energy balance
-									if (sfc[iIndex10][Constants.sfc_y_vector] > 0.5)
-									{
-
-										Tsfc_N = Tsfc_N + Tsfc[iabCount];
-										Trad_N = Trad_N + Math.pow(((1. / TUFreg3D.sigma)
-												* (sfc[iIndex10][Constants.sfc_emiss] * TUFreg3D.sigma * Math.pow(Tsfc[iabCount], 4)
-														+ refltl[iabCount])),
-												(0.25));
-										Rnet_N = Rnet_N + Rnet
-												- sfc[iIndex10][Constants.sfc_emiss] * TUFreg3D.sigma * Math.pow(Tsfc[iabCount], 4);
-										Kdn_N = Kdn_N + tots[iabCount];
-										Kup_N = Kup_N + reflts[iabCount];
-										Ldn_N = Ldn_N + totl[iabCount];
-										Lup_N = Lup_N + refltl[iabCount]
-												+ sfc[iIndex10][Constants.sfc_emiss] * TUFreg3D.sigma * Math.pow(Tsfc[iabCount], 4);
-										Qh_N = Qh_N + httc * (Tsfc[iabCount] - Tconv);
-										Qg_N = Qg_N + lambda_sfc[iabCount]
-												* (Tsfc[iabCount] - sfc_ab[iabCount][Constants.sfc_ab_layer_temp]) * 2.
-												/ sfc_ab[iabCount][sixPlusThreeTimesNumlayers];
-										Qanthro = Qanthro + Math.max(0., (Tintw - sfc_ab[iabCount][fivePlusNumlayers])
-												* lambdaavw[numlayersMinus1] * 2. / thickw[numlayersMinus1]);
-										Qac = Qac + Math.max(0., (sfc_ab[iabCount][fivePlusNumlayers] - Tintw)
-												* lambdaavw[numlayersMinus1] * 2. / thickw[numlayersMinus1]);
-										if (sfc[iIndex10][Constants.sfc_sunlight_fact] > 3.5)
+										if (sfc[iIndex10][Constants.sfc_surface_type] > 2.5)
 										{
-											TNsun = TNsun + Tsfc[iabCount];
-											numNsun = numNsun + 1;
+											httcW = httcW + httc;
 										}
-										else if (sfc[iIndex10][Constants.sfc_sunlight_fact] < 0.5)
+										//  N wall sfc T and energy balance
+										if (sfc[iIndex10][Constants.sfc_y_vector] > 0.5)
+										{	
+											HashMap wallEnergyBalanceReturn = energyBalances.wallEnergyBalance(Tsfc, iabCount, sfc, iIndex10, sixPlusThreeTimesNumlayers, numlayersMinus1, fivePlusNumlayers,
+													Rnet, httc, Tconv, Tintw, tots, reflts, totl, refltl, lambda_sfc,sfc_ab, thickw, lambdaavw,
+													Tsfc_N, Trad_N, Rnet_N, Kdn_N, Kup_N, Ldn_N, Lup_N, Qh_N, Qg_N, Qanthro, Qac, TNsun, TNsh, numNsun, numNsh);											
+											Qanthro=(double) wallEnergyBalanceReturn.get("Qanthro");
+											Qac=(double) wallEnergyBalanceReturn.get("Qac");
+											Tsfc_N=(double) wallEnergyBalanceReturn.get("Tsfc_DIR");
+											Trad_N=(double) wallEnergyBalanceReturn.get("Trad_DIR");
+											Rnet_N=(double) wallEnergyBalanceReturn.get("Rnet_DIR");
+											Kdn_N=(double) wallEnergyBalanceReturn.get("Kdn_DIR");
+											Kup_N=(double) wallEnergyBalanceReturn.get("Kup_DIR");
+											Ldn_N=(double) wallEnergyBalanceReturn.get("Ldn_DIR");
+											Lup_N=(double) wallEnergyBalanceReturn.get("Lup_DIR");
+											Qh_N=(double) wallEnergyBalanceReturn.get("Qh_DIR");
+											Qg_N=(double) wallEnergyBalanceReturn.get("Qg_DIR");
+											TNsun=(double) wallEnergyBalanceReturn.get("TDIRsun");
+											TNsh=(double) wallEnergyBalanceReturn.get("TDIRsh");
+											numNsun=(int) wallEnergyBalanceReturn.get("numDIRsun");
+											numNsh=(int) wallEnergyBalanceReturn.get("numDIRsh");
+											wallEnergyBalanceReturn=null;											
+										}
+										//  S wall sfc T and energy balance
+										if (sfc[iIndex10][Constants.sfc_y_vector] < -0.5)
+										{	
+											HashMap wallEnergyBalanceReturn = energyBalances.wallEnergyBalance(Tsfc, iabCount, sfc, iIndex10, sixPlusThreeTimesNumlayers, numlayersMinus1, fivePlusNumlayers,
+													Rnet, httc, Tconv, Tintw, tots, reflts, totl, refltl, lambda_sfc,sfc_ab, thickw, lambdaavw,
+													Tsfc_S, Trad_S, Rnet_S, Kdn_S, Kup_S, Ldn_S, Lup_S, Qh_S, Qg_S, Qanthro, Qac, TSsun, TSsh, numSsun, numSsh);											
+											Qanthro=(double) wallEnergyBalanceReturn.get("Qanthro");
+											Qac=(double) wallEnergyBalanceReturn.get("Qac");
+											Tsfc_S=(double) wallEnergyBalanceReturn.get("Tsfc_DIR");
+											Trad_S=(double) wallEnergyBalanceReturn.get("Trad_DIR");
+											Rnet_S=(double) wallEnergyBalanceReturn.get("Rnet_DIR");
+											Kdn_S=(double) wallEnergyBalanceReturn.get("Kdn_DIR");
+											Kup_S=(double) wallEnergyBalanceReturn.get("Kup_DIR");
+											Ldn_S=(double) wallEnergyBalanceReturn.get("Ldn_DIR");
+											Lup_S=(double) wallEnergyBalanceReturn.get("Lup_DIR");
+											Qh_S=(double) wallEnergyBalanceReturn.get("Qh_DIR");
+											Qg_S=(double) wallEnergyBalanceReturn.get("Qg_DIR");
+											TSsun=(double) wallEnergyBalanceReturn.get("TDIRsun");
+											TSsh=(double) wallEnergyBalanceReturn.get("TDIRsh");
+											numSsun=(int) wallEnergyBalanceReturn.get("numDIRsun");
+											numSsh=(int) wallEnergyBalanceReturn.get("numDIRsh");
+											wallEnergyBalanceReturn=null;
+										}
+										//  E wall sfc T and energy balance
+										if (sfc[iIndex10][Constants.sfc_x_vector] > 0.5)
 										{
-											TNsh = TNsh + Tsfc[iabCount];
-											numNsh = numNsh + 1;
+											HashMap wallEnergyBalanceReturn = energyBalances.wallEnergyBalance(Tsfc, iabCount, sfc, iIndex10, sixPlusThreeTimesNumlayers, numlayersMinus1, fivePlusNumlayers,
+													Rnet, httc, Tconv, Tintw, tots, reflts, totl, refltl, lambda_sfc,sfc_ab, thickw, lambdaavw,
+													Tsfc_E, Trad_E, Rnet_E, Kdn_E, Kup_E, Ldn_E, Lup_E, Qh_E, Qg_E, Qanthro, Qac, TEsun, TEsh, numEsun, numEsh);											
+											Qanthro=(double) wallEnergyBalanceReturn.get("Qanthro");
+											Qac=(double) wallEnergyBalanceReturn.get("Qac");
+											Tsfc_E=(double) wallEnergyBalanceReturn.get("Tsfc_DIR");
+											Trad_E=(double) wallEnergyBalanceReturn.get("Trad_DIR");
+											Rnet_E=(double) wallEnergyBalanceReturn.get("Rnet_DIR");
+											Kdn_E=(double) wallEnergyBalanceReturn.get("Kdn_DIR");
+											Kup_E=(double) wallEnergyBalanceReturn.get("Kup_DIR");
+											Ldn_E=(double) wallEnergyBalanceReturn.get("Ldn_DIR");
+											Lup_E=(double) wallEnergyBalanceReturn.get("Lup_DIR");
+											Qh_E=(double) wallEnergyBalanceReturn.get("Qh_DIR");
+											Qg_E=(double) wallEnergyBalanceReturn.get("Qg_DIR");
+											TEsun=(double) wallEnergyBalanceReturn.get("TDIRsun");
+											TEsh=(double) wallEnergyBalanceReturn.get("TDIRsh");
+											numEsun=(int) wallEnergyBalanceReturn.get("numDIRsun");
+											numEsh=(int) wallEnergyBalanceReturn.get("numDIRsh");
+											wallEnergyBalanceReturn=null;
+										}
+										//  W wall sfc T and energy balance
+										if (sfc[iIndex10][Constants.sfc_x_vector] < -0.5)
+										{
+											HashMap wallEnergyBalanceReturn = energyBalances.wallEnergyBalance(Tsfc, iabCount, sfc, iIndex10, sixPlusThreeTimesNumlayers, numlayersMinus1, fivePlusNumlayers,
+													Rnet, httc, Tconv, Tintw, tots, reflts, totl, refltl, lambda_sfc,sfc_ab, thickw, lambdaavw,
+													Tsfc_W, Trad_W, Rnet_W, Kdn_W, Kup_W, Ldn_W, Lup_W, Qh_W, Qg_W, Qanthro, Qac, TWsun, TWsh, numWsun, numWsh);											
+											Qanthro=(double) wallEnergyBalanceReturn.get("Qanthro");
+											Qac=(double) wallEnergyBalanceReturn.get("Qac");
+											Tsfc_W=(double) wallEnergyBalanceReturn.get("Tsfc_DIR");
+											Trad_W=(double) wallEnergyBalanceReturn.get("Trad_DIR");
+											Rnet_W=(double) wallEnergyBalanceReturn.get("Rnet_DIR");
+											Kdn_W=(double) wallEnergyBalanceReturn.get("Kdn_DIR");
+											Kup_W=(double) wallEnergyBalanceReturn.get("Kup_DIR");
+											Ldn_W=(double) wallEnergyBalanceReturn.get("Ldn_DIR");
+											Lup_W=(double) wallEnergyBalanceReturn.get("Lup_DIR");
+											Qh_W=(double) wallEnergyBalanceReturn.get("Qh_DIR");
+											Qg_W=(double) wallEnergyBalanceReturn.get("Qg_DIR");
+											TWsun=(double) wallEnergyBalanceReturn.get("TDIRsun");
+											TWsh=(double) wallEnergyBalanceReturn.get("TDIRsh");
+											numWsun=(int) wallEnergyBalanceReturn.get("numDIRsun");
+											numWsh=(int) wallEnergyBalanceReturn.get("numDIRsh");
+											wallEnergyBalanceReturn=null;
 										}
 									}
-									//  S wall sfc T and energy balance
-									if (sfc[iIndex10][Constants.sfc_y_vector] < -0.5)
-									{
-
-										Tsfc_S = Tsfc_S + Tsfc[iabCount];
-										Trad_S = Trad_S + Math.pow(((1. / TUFreg3D.sigma)
-												* (sfc[iIndex10][Constants.sfc_emiss] * TUFreg3D.sigma * Math.pow(Tsfc[iabCount], 4)
-														+ refltl[iabCount])),
-												(0.25));
-										Rnet_S = Rnet_S + Rnet
-												- sfc[iIndex10][Constants.sfc_emiss] * TUFreg3D.sigma * Math.pow(Tsfc[iabCount], 4);
-										Kdn_S = Kdn_S + tots[iabCount];
-										Kup_S = Kup_S + reflts[iabCount];
-										Ldn_S = Ldn_S + totl[iabCount];
-										Lup_S = Lup_S + refltl[iabCount]
-												+ sfc[iIndex10][Constants.sfc_emiss] * TUFreg3D.sigma * Math.pow(Tsfc[iabCount], 4);
-										Qh_S = Qh_S + httc * (Tsfc[iabCount] - Tconv);
-										Qg_S = Qg_S + lambda_sfc[iabCount]
-												* (Tsfc[iabCount] - sfc_ab[iabCount][Constants.sfc_ab_layer_temp]) * 2.
-												/ sfc_ab[iabCount][sixPlusThreeTimesNumlayers];
-										Qanthro = Qanthro + Math.max(0., (Tintw - sfc_ab[iabCount][fivePlusNumlayers])
-												* lambdaavw[numlayersMinus1] * 2. / thickw[numlayersMinus1]);
-										Qac = Qac + Math.max(0., (sfc_ab[iabCount][fivePlusNumlayers] - Tintw)
-												* lambdaavw[numlayersMinus1] * 2. / thickw[numlayersMinus1]);
-										if (sfc[iIndex10][Constants.sfc_sunlight_fact] > 3.5)
-										{
-											TSsun = TSsun + Tsfc[iabCount];
-											numSsun = numSsun + 1;
-										}
-										else if (sfc[iIndex10][Constants.sfc_sunlight_fact] < 0.5)
-										{
-											TSsh = TSsh + Tsfc[iabCount];
-											numSsh = numSsh + 1;
-										}
-									}
-									//  E wall sfc T and energy balance
-									if (sfc[iIndex10][Constants.sfc_x_vector] > 0.5)
-									{
-
-										Tsfc_E = Tsfc_E + Tsfc[iabCount];
-										Trad_E = Trad_E + Math.pow(((1. / TUFreg3D.sigma)
-												* (sfc[iIndex10][Constants.sfc_emiss] * TUFreg3D.sigma * Math.pow(Tsfc[iabCount], 4)
-														+ refltl[iabCount])),
-												(0.25));
-										Rnet_E = Rnet_E + Rnet
-												- sfc[iIndex10][Constants.sfc_emiss] * TUFreg3D.sigma * Math.pow(Tsfc[iabCount], 4);
-										Kdn_E = Kdn_E + tots[iabCount];
-										Kup_E = Kup_E + reflts[iabCount];
-										Ldn_E = Ldn_E + totl[iabCount];
-										Lup_E = Lup_E + refltl[iabCount]
-												+ sfc[iIndex10][Constants.sfc_emiss] * TUFreg3D.sigma * Math.pow(Tsfc[iabCount], 4);
-										Qh_E = Qh_E + httc * (Tsfc[iabCount] - Tconv);
-										Qg_E = Qg_E + lambda_sfc[iabCount]
-												* (Tsfc[iabCount] - sfc_ab[iabCount][Constants.sfc_ab_layer_temp]) * 2.
-												/ sfc_ab[iabCount][sixPlusThreeTimesNumlayers];
-
-										Qanthro = Qanthro + Math.max(0., (Tintw - sfc_ab[iabCount][fivePlusNumlayers])
-												* lambdaavw[numlayersMinus1] * 2. / thickw[numlayersMinus1]);
-										Qac = Qac + Math.max(0., (sfc_ab[iabCount][fivePlusNumlayers] - Tintw)
-												* lambdaavw[numlayersMinus1] * 2. / thickw[numlayersMinus1]);
-										if (sfc[iIndex10][Constants.sfc_sunlight_fact] > 3.5)
-										{
-											TEsun = TEsun + Tsfc[iabCount];
-											numEsun = numEsun + 1;
-										}
-										else if (sfc[iIndex10][Constants.sfc_sunlight_fact] < 0.5)
-										{
-											TEsh = TEsh + Tsfc[iabCount];
-											numEsh = numEsh + 1;
-										}
-									}
-									//  W wall sfc T and energy balance
-									if (sfc[iIndex10][Constants.sfc_x_vector] < -0.5)
-									{
-
-										Tsfc_W = Tsfc_W + Tsfc[iabCount];
-
-										Trad_W = Trad_W + Math.pow(((1. / TUFreg3D.sigma) * (sfc[iIndex10][Constants.sfc_emiss] * TUFreg3D.sigma * Math.pow(Tsfc[iabCount], 4) 
-												+ refltl[iabCount])), (0.25));
-										Absbs_W = Absbs_W + absbs[iabCount];
-										Absbl_W = Absbl_W + absbl[iabCount];
-										Emit_W = Emit_W + sfc[iIndex10][Constants.sfc_emiss] * TUFreg3D.sigma * Math.pow(Tsfc[iabCount], 4);
-										Rnet_W = Rnet_W + Rnet - sfc[iIndex10][Constants.sfc_emiss] * TUFreg3D.sigma * Math.pow(Tsfc[iabCount], 4);
-										Kdn_W = Kdn_W + tots[iabCount];
-										Kup_W = Kup_W + reflts[iabCount];
-										Ldn_W = Ldn_W + totl[iabCount];
-										Lup_W = Lup_W + refltl[iabCount] + sfc[iIndex10][Constants.sfc_emiss] * TUFreg3D.sigma * Math.pow(Tsfc[iabCount], 4);
-										Qh_W = Qh_W + httc * (Tsfc[iabCount] - Tconv);
-
-										Qg_W = Qg_W + lambda_sfc[iabCount] * (Tsfc[iabCount] - sfc_ab[iabCount][Constants.sfc_ab_layer_temp]) * 2.
-												/ sfc_ab[iabCount][sixPlusThreeTimesNumlayers];
-										Qanthro = Qanthro + Math.max(0., (Tintw - sfc_ab[iabCount][fivePlusNumlayers])
-												* lambdaavw[numlayersMinus1] * 2. / thickw[numlayersMinus1]);
-										Qac = Qac + Math.max(0., (sfc_ab[iabCount][fivePlusNumlayers] - Tintw)
-												* lambdaavw[numlayersMinus1] * 2. / thickw[numlayersMinus1]);
-										if (sfc[iIndex10][Constants.sfc_sunlight_fact] > 3.5)
-										{
-											TWsun = TWsun + Tsfc[iabCount];
-											numWsun = numWsun + 1;
-										}
-										else if (sfc[iIndex10][Constants.sfc_sunlight_fact] < 0.5)
-										{
-											TWsh = TWsh + Tsfc[iabCount];
-											numWsh = numWsh + 1;
-										}	
-									}
-								}
 								}
 
 								//  END OF ITERATIVE TSFC LOOP
@@ -2395,7 +1517,7 @@ if (Kbeam > 10000)
 										tthresholdLoops = 0;
 									}
 								}
-							} // goto 898 replacement
+							} 
 
 							Kup = Kup / (1.0*avg_cnt);
 							Lup = Lup / (1.0*avg_cnt);
@@ -2405,19 +1527,18 @@ if (Kbeam > 10000)
 							//  update internal building air temperature:
 							// (Masson et al. 2002)
 							//  86400 is the number of seconds in a day
-							Tintw = Tintw * (86400. - deltat) / 86400.
-									+ Tp / (numwall2 + 2. * numroof2) * deltat / 86400.;
+							Tintw = Tintw * (86400. - deltat) / 86400. + Tp / (numwall2 + 2. * numroof2) * deltat / 86400.;
 							//  put minimum on internal building temperature
 							Tintw = Math.max(Tintw, 273.15 + Tbuild_min);
 
 							Qhcan = Qhcantmp / (1.0*numroof2 + numstreet2) / (1. - lambdapR);
 
 							//  canyon-atm exchange:
-							Ri = util.SFC_RI(zref - zH + z0, Ta, Tcan, Ua);
-							HashMap<String, Double> htcReturn8 = util.HTC(Ri, Ua, zref - zH + z0, z0, z0);
+							double Ri5 = util.SFC_RI(zref - zH + z0, Ta, Tcan, Ua);
+							HashMap<String, Double> htcReturn8 = util.HTC(Ri5, Ua, zref - zH + z0, z0, z0);
 							httc_top = htcReturn8.get("httc_out");
-							Fh = htcReturn8.get("Fh");
-							Qhtop = TUFreg3D.cpair * rhoa * httc_top * (Tcan - Ta);
+//							double Fh4 = htcReturn8.get("Fh");
+							double Qhtop = TUFreg3D.cpair * rhoa * httc_top * (Tcan - Ta);
 
 							//  Checking for oscillations: (0.05 is, from experience, a number that
 							//  cuts off oscillations early enough without reacting to normal changes
@@ -2429,7 +1550,6 @@ if (Kbeam > 10000)
 							//  the forcing causes the canyon temperature to reverse trend
 							if (Math.abs(deltat * (Qhcan - Qhtop) / Cairavg - dTcan_old) > 0.05 && deltat > 2.)
 							{
-
 								timeis = timeis - deltat / 3600.;
 								deltat = deltat * 5. / 8.;
 								counter = 10;
@@ -2479,107 +1599,20 @@ if (Kbeam > 10000)
 							TW_avg = TW_avg + Tsfc_W / (1.0*numWwall2) - 273.15;
 
 							//  Conduction Loop
-							for (int iabCount = 1 - 1; iabCount < numsfc2; iabCount++)
-							{
-
-								//  CONDUCTION - combination of Arnfield (198X), Masson (2000), Jacobson (1999)
-								//  thermal conductivities (in W/K/m2) are added in series instead of
-								//  plain averaging, Tsfc calculated iteratively above acts as the surface
-								//  boundary condition
-
-								//  roofs and walls
-								double Tint = Tintw;
-								//  streets
-								//add to initialize i (after changing to iIndex)
-								int i = (int) sfc_ab[iabCount][Constants.sfc_ab_i];
-								if (Math.abs(sfc[i][Constants.sfc_surface_type] - 2.) < 0.5)
-								{
-									Tint = Tints;
-								}
-
-								//  first calculate the thermal conductivities between layer centers by adding
-								//  thermal conductivities (or resistivities) in series
-								for (int k = 0; k < numlayers; k++)
-								{
-									tlayer[k] = sfc_ab[iabCount][k + 5];
-									tlayerp[k] = tlayer[k];
-									lambdaav[k] = sfc_ab[iabCount][k + numlayers + 5];
-									htcap[k] = sfc_ab[iabCount][k + 2 * numlayers + 5];
-									thick[k] = sfc_ab[iabCount][k + 3 * numlayers + 5];
-
-								}
-
-								//  surface matrix values:
-								double lambd_o_thick = lambdaav[TUFreg3D.ONE] / (thick[TUFreg3D.ONE] + thick[TUFreg3D.TWO]);
-								A[TUFreg3D.ONE] = 0.;
-								B[TUFreg3D.ONE] = thick[TUFreg3D.ONE] * htcap[TUFreg3D.ONE] / deltat + 2. * uc * (lambd_o_thick);
-								D[TUFreg3D.ONE] = -2. * uc * lambd_o_thick;
-								R[TUFreg3D.ONE] = -2. * (1. - uc) * lambd_o_thick * (tlayerp[TUFreg3D.ONE] - tlayerp[TUFreg3D.TWO])
-										+ tlayerp[TUFreg3D.ONE] * thick[TUFreg3D.ONE] * htcap[TUFreg3D.ONE] / deltat
-										+ (Tsfc[iabCount] - tlayerp[TUFreg3D.ONE]) * lambda_sfc[iabCount] / thick[TUFreg3D.ONE] * 2.;
-
-								//  what I have done above is make the surface boundary condition
-								//  "QGsfc" completely explicit, as written below, even though the
-								//  conduction can have any level of implicitness, it must conform
-								//  to this explicit boundary condition - prior, I had this BC in
-								//  the uc and 1-uc brackets to make the BC dependent on the implicitness
-								//  but then since the Tsfc solution assumes explicit conduction at
-								//  the sfc (i.e. BC using tlayerp(1)), this  would mean a loss or gain
-								//  of energy, since the condution solution would assume a different
-								//  amount of energy being conducted than the Tsfc solution
-
-								//  interior matrix values:
-								for (int k = 1; k < numlayersMinus1; k++)
-								{
-									lambd_o_thick = lambdaav[k - 1] / (thick[k - 1] + thick[k]);
-									double lambd_o_thick2 = lambdaav[k] / (thick[k] + thick[k + 1]);
-									A[k] = -2. * uc * lambd_o_thick;
-									B[k] = thick[k] * htcap[k] / deltat + 2. * uc * (lambd_o_thick + lambd_o_thick2);
-									D[k] = -2. * uc * lambd_o_thick2;
-									R[k] = -2. * (1. - uc) * (lambd_o_thick * (tlayerp[k] - tlayerp[k - 1])
-											+ lambd_o_thick2 * (tlayerp[k] - tlayerp[k + 1]))
-											+ tlayerp[k] * thick[k] * htcap[k] / deltat;
-								}
-
-								//  values for conduction (+ convection + radiation - Masson et al 2002)
-								//  between innermost layer and inner air
-								lambd_o_thick = lambdaav[numlayersMinus2] / (thick[numlayersMinus2] + thick[numlayersMinus1]);
-								A[numlayersMinus1] = -2. * uc * lambd_o_thick;
-								B[numlayersMinus1] = thick[numlayersMinus1] * htcap[numlayersMinus1] / deltat
-										+ 2. * uc * (lambd_o_thick + lambdaav[numlayersMinus1] / thick[numlayersMinus1] * IntCond);
-								D[numlayersMinus1] = 0.;
-								R[numlayersMinus1] = -2. * (1. - uc)
-										* (lambd_o_thick * (tlayerp[numlayersMinus1] - tlayerp[numlayersMinus2])
-												+ lambdaav[numlayersMinus1] * tlayerp[numlayersMinus1] / thick[numlayersMinus1] * IntCond)
-										+ 2. * lambdaav[numlayersMinus1] * Tint / thick[numlayersMinus1] * IntCond
-										+ tlayerp[numlayersMinus1] * thick[numlayersMinus1] * htcap[numlayersMinus1] / deltat;
-
-								//  TRIDIAGONAL MATRIX SOLUTION FROM JACOBSON, p. 166
-								gam[TUFreg3D.ONE] = -D[TUFreg3D.ONE] / B[TUFreg3D.ONE];
-								tlayer[TUFreg3D.ONE] = R[TUFreg3D.ONE] / B[TUFreg3D.ONE];
-
-								for (int k = 2 - 1; k < numlayers; k++)
-								{
-									denom[k] = B[k] + A[k] * gam[k - 1];
-									tlayer[k] = (R[k] - A[k] * tlayer[k - 1]) / denom[k];
-									gam[k] = -D[k] / denom[k];
-								}
-
-								for (int k = numlayersMinus2; k > 0-1; k--)
-								{
-									// do k=numlayers-1,1,-1
-									tlayer[k] = tlayer[k] + gam[k] * tlayer[k + 1];
-								}
-
-								for (int k = 0; k < numlayers; k++)
-								{
-									sfc_ab[iabCount][k + 5] = tlayer[k];
-								}
-
-							}
-							// 324 continue
-							// 349 continue
-
+							HashMap<String,double[]> conductionLoopReturn = energyBalances.conductionLoop(numsfc2, Tintw, sfc_ab, Tints, sfc, numlayers, tlayer,
+										tlayerp, lambdaav, htcap, thick, A, B, D, R, gam, denom, numlayersMinus1, uc, Tsfc, deltat, lambda_sfc, numlayersMinus2, IntCond);
+							tlayer=conductionLoopReturn.get("tlayer");
+							tlayerp=conductionLoopReturn.get("tlayerp");
+							lambdaav=conductionLoopReturn.get("lambdaav");
+							htcap=conductionLoopReturn.get("htcap");
+							thick=conductionLoopReturn.get("thick");
+							A=conductionLoopReturn.get("A");
+							B=conductionLoopReturn.get("B");
+							D=conductionLoopReturn.get("D");
+							R=conductionLoopReturn.get("R");
+							denom=conductionLoopReturn.get("denom");
+							gam=conductionLoopReturn.get("gam");
+							conductionLoopReturn=null;
 							 
 							double amodTime = (timeis % 24.);
 							UTCI utci = new UTCI();
@@ -2677,7 +1710,7 @@ if (Kbeam > 10000)
 								}
 								String ydwrite = common.padLeft( yd, 3, '0') ;
 
-								tempTimeis = (int) (timeis * 2);
+								int tempTimeis = (int) (timeis * 2);
 								if (tempTimeis < 1)
 								{
 									tempTimeis = 1;
@@ -2721,18 +1754,8 @@ if (Kbeam > 10000)
 							{
 								ywrite = true;
 							}
-							//// 309 continue
+							
 						}
-						//
-						// if(ywrite)
-						// {
-						// last_write=true;
-						// //!! KN had to comment this out because compiler crashes
-						// //! goto 349
-						// }
-						//// 351 continue
-						// last_write=false;
-						// frcwrite=false;
 						stror = stror + strorint;
 						//  this is the enddo for the street orientation iteration
 					}

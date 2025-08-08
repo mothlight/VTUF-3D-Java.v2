@@ -45,10 +45,8 @@
 package VTUF3D;
 
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.HashMap;
 
-import VTUF3D.Utilities.Common;
 import VTUF3D.Utilities.MaespaDataFile;
 import VTUF3D.Utilities.Namelist;
 
@@ -60,7 +58,7 @@ public class TUFreg3D
 	protected static int restartedRunStartTimestep = 0;
 //	protected static int restartedRunNumber = 0;
 	
-	VTUF3DUtil util = new VTUF3DUtil();
+//	VTUF3DUtil util = new VTUF3DUtil();
 	private String[] args;
 	
 	public static long startTime = System.currentTimeMillis();
@@ -160,47 +158,10 @@ public class TUFreg3D
 		//now you can restart a crashed run
 		restartedRun = parameters.restartedRun;
 		restartedRunStartTimestep = parameters.restartedRunStartTimestep;
-//		restartedRunNumber = parameters.restartedRunNumber;
 		
-		// ! radiative parameters
-		double dalb = parameters.dalb;
-		double albr = parameters.albr;
-		double albs = parameters.albs;
-		double albw = parameters.albw;
-		double emisr = parameters.emisr;
-		double emiss = parameters.emiss;
-		double emisw = parameters.emisw;
-		int cloudtype = parameters.cloudtype;
 
-		// ! conduction parameters
-		double IntCond = parameters.IntCond;
-//		double Intresist = parameters.Intresist;
-		double uc = parameters.uc;
-		int numlayers = parameters.numlayers;
 
-		double[] htcap = new double[numlayers];
-		double[] thick = new double[numlayers];
-		double[] tlayerp = new double[numlayers];
-		double[] htcapr = parameters.htcapr;
-		double[] htcaps = parameters.htcaps;
-		double[] htcapw = parameters.htcapw;
 
-		// ! convection parameters
-		double z0 = parameters.z0;
-		double lambdaf = parameters.lambdaf;
-		double zrooffrc = parameters.zrooffrc;
-		double z0roofm = parameters.z0roofm;
-		double z0roadm = parameters.z0roadm;
-		double z0roofh = parameters.z0roofh;
-		double z0roadh = parameters.z0roadh;
-		double moh = parameters.moh;
-		double rw = parameters.rw;
-		
-		// ! domain geometry
-		//this is obsolete now, calculated from the domains later on now
-		double buildht_m = parameters.buildht_m;
-		double zref = parameters.zref;
-		int minres = parameters.minres;
 
 
 
@@ -217,11 +178,7 @@ public class TUFreg3D
 		int numbhbl = parameters.numbhbl;
 		double[] bh_o_bl = parameters.bh_o_bl;
 
-		boolean calcz0 = false;
-		if (z0 < 0.)
-		{
-			calcz0 = true;
-		}
+
 
 		if (vfcalc == 0 && (numlp > 1 || numbhbl > 1))
 		{
@@ -244,34 +201,12 @@ public class TUFreg3D
 			System.exit(1);
 		}
 
-
-
-//		outputResults.writeInputs(overall, vfcalc, yd, deltat, outpt_tm, Tthreshold,
-//				facet_out, matlab_out, sum_out, dalb, albr, albs, albw, emisr, emiss, emisw, cloudtype,
-//				IntCond, Intresist, uc, numlayers, thickr, lambdar, htcapr,
-//				thicks, lambdas, htcaps, thickw, lambdaw, htcapw, z0, lambdaf, zrooffrc,
-//				z0roofm, z0roadm, z0roofh, z0roadh, moh, rw, buildht_m, zref, minres,
-//				Tsfcr, Tsfcs, Tsfcw, Tintw, Tints, Tfloor, Tbuild_min,
-//				stror_in, strorint, strormax, xlat_in, xlatint,  xlatmax, numlp, lpin, numbhbl, bh_o_bl);
-
-		
-	
-
 		
 		VTUF3DLoop loop = new VTUF3DLoop();
-		loop.loop(numlp, numbhbl, minres, vfcalc, lpin, treeMapFromConfig, buildht_m, zref, overall, numlayers,htcapr, htcaps, htcapw, uc, util, namelists, treeXYMap,
-				z0roofh, z0roofm, z0roadh, z0roadm, moh, albs, emiss, treeXYTreeMap, 
-				albr, emisr, albw, emisw,
-				lambdaf, calcz0, z0, xlat_in, xlatmax, stror_in, strormax, facet_out, bh_o_bl, 
-				yd, outpt_tm,				
-				thick, IntCond,				
-				Ldn_fact, cloudtype, treeXYMapSunlightPercentageTotal, maespaTestflxData,
-				dalb,
-				rw, zrooffrc,
-				DIFFERENTIALSHADINGDIFFUSE, maespaDataArray,
-				Tthreshold,
-				tlayerp, htcap,
-				sum_out, matlab_out, writeTsfc, writeKl, writeKabs, writeKrefl, writeLabs, writeLrefl, writeLdown,  writeTmrt, writeUtci, 
+		loop.loop(numlp, numbhbl, vfcalc, lpin, treeMapFromConfig, overall, namelists, treeXYMap,
+				treeXYTreeMap, xlat_in, xlatmax, stror_in, strormax, facet_out, bh_o_bl, 
+				yd, outpt_tm, Ldn_fact, treeXYMapSunlightPercentageTotal, maespaTestflxData, DIFFERENTIALSHADINGDIFFUSE, maespaDataArray,
+				Tthreshold, sum_out, matlab_out, writeTsfc, writeKl, writeKabs, writeKrefl, writeLabs, writeLrefl, writeLdown,  writeTmrt, writeUtci, 
 				writeEnergyBalances,  strorint,  xlatint,  year, restartedRunStartTimestep, rootDirectory, parameters);
 
 	}
