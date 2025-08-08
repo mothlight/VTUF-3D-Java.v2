@@ -2,7 +2,7 @@ package VTUF3D;
 
 import java.util.HashMap;
 
-import VTUF3D.Utilities.MaespaDataFile;
+import VTUF3D.Utilities.VegetationDataFile;
 
 public class ReverseRay
 {
@@ -42,7 +42,7 @@ public class ReverseRay
 		// forward ray trace originated.
 	      public static double reverseRayTrace(double xt,double xinc,double yt,double yinc,double zt,double zinc,int XTEST,int YTEST,int ZTEST,
 	    		  double bh,double al2,double aw2,boolean[][][] veg_shade,double timeis,int yd_actual,
-	    		  int[][] treeXYMap, HashMap<String,MaespaDataFile> maespaTestflxData )
+	    		  int[][] treeXYMap, HashMap<String,VegetationDataFile> vegetationTestflxData )
 	      {
 		    	  
 		    	  double finalTransmissionPercentage;
@@ -136,7 +136,7 @@ public class ReverseRay
 		           
 		                  //TODO figure out how to replace TestflxData, variable TD (total transission) with online Maespa
 		                    // get transmission here
-		                    transmissionPercentage = 1.0 - OverallConfiguration.getTransmissionForTree(treeConfigLocation, maespaTestflxData);
+		                    transmissionPercentage = 1.0 - OverallConfiguration.getTransmissionForVegetation(treeConfigLocation, vegetationTestflxData);
 		                   
 		                    lastTreeProcessed = treeConfigLocation;
 

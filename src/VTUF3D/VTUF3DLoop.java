@@ -10,6 +10,7 @@ import Simpel.SimpelSurface;
 import VTUF3D.Utilities.Common;
 import VTUF3D.Utilities.MaespaDataFile;
 import VTUF3D.Utilities.Namelist;
+import VTUF3D.Utilities.VegetationDataFile;
 
 public class VTUF3DLoop
 {	
@@ -19,12 +20,12 @@ public class VTUF3DLoop
 	OutputResults outputResults = new OutputResults();
 	VTUF3DUtil util = new VTUF3DUtil();
 	
-	public void loop(int numlp, int numbhbl, int vfcalc, double[] lpin, MaespaConfigTreeMapState treeMapFromConfig, 
+	public void loop(int numlp, int numbhbl, int vfcalc, double[] lpin, ConfigTreeMapState treeMapFromConfig, 
 			OverallConfiguration overall, HashMap<String, HashMap<String, Namelist>> namelists, int[][] treeXYMap,			
 			int[][] treeXYTreeMap,  double xlat_in, double xlatmax, double stror_in, double strormax, boolean facet_out, 
 			double[] bh_o_bl, int yd, double outpt_tm, double Ldn_fact, double[][] treeXYMapSunlightPercentageTotal, 
-			HashMap<String, MaespaDataFile> maespaTestflxData, 			
-			int DIFFERENTIALSHADINGDIFFUSE, HashMap<String, ArrayList<MaespaDataResults>> maespaDataArray,  double Tthreshold, 
+			HashMap<String, VegetationDataFile> maespaTestflxData, 			
+			int DIFFERENTIALSHADINGDIFFUSE, HashMap<String, ArrayList<VegetationDataResults>> vegetationDataArray,  double Tthreshold, 
 			boolean sum_out, boolean matlab_out, boolean writeTsfc, boolean writeKl, boolean writeKabs, boolean writeKrefl, boolean writeLabs, 
 			boolean writeLrefl, boolean writeLdown, boolean writeTmrt, boolean writeUtci, boolean writeEnergyBalances, double strorint, double xlatint, int year, 
 			int restartedRunStartTimestep, String rootDirectory, ParametersDat parameters)
@@ -1274,7 +1275,7 @@ public class VTUF3DLoop
 										}
 	
 										HashMap energyBalanceForVegetationReturn = energyBalances.energyBalanceForVegetation(treeXYMap, sfc_ab_map_x, sfc_ab_map_y, iabCount, timeis, diffShadingValueUsed,
-												Tsfc, maespaDataArray, treeXYTreeMap, leFromEt5, simpelQe, sfc, sfc_ab, iIndex10, patchlen, zH, Rnet, httc, Tconv,
+												Tsfc, vegetationDataArray, treeXYTreeMap, leFromEt5, simpelQe, sfc, sfc_ab, iIndex10, patchlen, zH, Rnet, httc, Tconv,
 												 currentRnet, currentQh, currentQe, currentQg, Rnet_tot, Qh_tot, Qe_tot, Qg_tot, sixPlusThreeTimesNumlayers, lambda_sfc);
 										
 										currentRnet=(double[]) energyBalanceForVegetationReturn.get("currentRnet");
@@ -1730,7 +1731,7 @@ public class VTUF3DLoop
 										ind_ab, Tsfc, tots, totl, reflts, refltl, absbs, timeis, Ldn, treeXYMap, 
 										sfc_ab_map_x, sfc_ab_map_y, absbl, diffShadingValueUsed, tempTimeis, Tcan, 
 										ea, Ua,  zen, Acan, Bcan, Ccan, patchlen, currentRnet, currentQh, currentQe, 
-										currentQg, utci, maespaDataArray);		
+										currentQg, utci, vegetationDataArray);		
 
 								UrbanPlumberOutput outputUrbanPlumber = new UrbanPlumberOutput();
 								outputUrbanPlumber.output( time_out, first_write, overall, tots, totl, reflts, refltl, 

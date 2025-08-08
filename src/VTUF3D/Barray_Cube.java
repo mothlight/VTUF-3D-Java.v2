@@ -266,7 +266,7 @@ public class Barray_Cube
 	  
 	  public static HashMap<String,int[][]> barray_cube(int BW,int BL,int SW, int SW2,int AL,int AW, int BH, int[][] bldht, int[][] veght, 
 			  HashMap<String,HashMap<String,Namelist>> namelists, int[][] treeXYMap,
-			  MaespaConfigTreeMapState treeMapFromConfig)
+			  ConfigTreeMapState treeMapFromConfig)
 	  {
 		  HashMap<String,int[][]> returnValues = new HashMap<String,int[][]>(); 
 		  int calculatedVegHeight;    

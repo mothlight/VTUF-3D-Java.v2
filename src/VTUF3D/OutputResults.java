@@ -804,7 +804,7 @@ public class OutputResults
 			int diffShadingValueUsed, int tempTimeis,  double Tcan, double ea,  double Ua, 
 			double zen,  double Acan, double Bcan, double Ccan, double patchlen, double[] currentRnet, 
 			double[] currentQh, double[] currentQe, double[] currentQg, UTCI utci, 
-			HashMap<String, ArrayList<MaespaDataResults>>maespaDataArray)
+			HashMap<String, ArrayList<VegetationDataResults>>vegetationDataArray)
 	{
 		String formattedTime;
 		double gridUtci;
@@ -1132,9 +1132,9 @@ public class OutputResults
 
 											String key = treeXYMap[sfc_ab_map_x[jab]][sfc_ab_map_y[jab]]
 													+ "_" + diffShadingValueUsed;
-											maespaTcanForTmrtCalc = maespaDataArray.get(key)
+											maespaTcanForTmrtCalc = vegetationDataArray.get(key)
 													.get(tempTimeis).getTCAN() + 273.15;
-											maespasoiltForTmrtCalc = maespaDataArray.get(key)
+											maespasoiltForTmrtCalc = vegetationDataArray.get(key)
 													.get(tempTimeis).getSoilt1() + 273.15;
 
 

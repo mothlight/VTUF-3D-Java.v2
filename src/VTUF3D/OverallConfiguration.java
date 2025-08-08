@@ -8,6 +8,7 @@ import java.util.HashMap;
 import VTUF3D.Utilities.Common;
 import VTUF3D.Utilities.MaespaDataFile;
 import VTUF3D.Utilities.Namelist;
+import VTUF3D.Utilities.VegetationDataFile;
 
 public class OverallConfiguration
 {
@@ -78,6 +79,82 @@ public class OverallConfiguration
 		return treeHeightInt;
 	}
 	
+	public HashMap<String,ArrayList<VegetationDataResults>> mapTrees(ConfigTreeMapState treeMapFromConfig)
+	{
+		VegetationConfiguration treeConfig = new VegetationConfiguration();
+		HashMap<String,ArrayList<VegetationDataResults>> returnValues = new HashMap<String,ArrayList<VegetationDataResults>>();
+		String rootDirectory = treeMapFromConfig.rootDirectory;
+		treeXYMap = new int[treeMapFromConfig.width][treeMapFromConfig.length];
+		treeXYTreeMap = new int[treeMapFromConfig.width][treeMapFromConfig.length];
+		int x,y;
+        int numberOfTreePlots;
+        double gridSize;
+        int treeFilesNumber;
+        int treeNumber;        
+        numberOfTreePlots = treeMapFromConfig.numberTreePlots;
+        gridSize = treeMapFromConfig.configTreeMapGridSize;      
+        for (int loopCount= 0;loopCount < numberOfTreePlots;loopCount++)
+        {
+                x=treeMapFromConfig.xLocation[loopCount];
+                y=treeMapFromConfig.yLocation[loopCount];
+                treeFilesNumber=treeMapFromConfig.treesfileNumber[loopCount];
+                int treeHeight= treeMapFromConfig.treesHeight[loopCount];
+                treeNumber=treeMapFromConfig.trees[loopCount];
+                treeXYMap[x][y]=treeFilesNumber  ;
+                treeXYTreeMap[x][y]=treeNumber;
+                for (int diffShadingType =1;diffShadingType < 3;diffShadingType++)
+                {
+                	ArrayList<VegetationDataResults> maespaHRWatData= returnValues.get(treeFilesNumber+"_"+diffShadingType);
+                	if (maespaHRWatData == null)
+                	{
+                		maespaHRWatData = treeConfig.readVegetationHRWatDataFiles(treeFilesNumber, gridSize, diffShadingType, rootDirectory);
+                	}
+                	returnValues.put(treeFilesNumber+"_"+diffShadingType, maespaHRWatData);
+                }
+                
+                
+                
+        }
+//        System.out.println(returnValues.toString());
+        return returnValues;
+	}
+	
+	public HashMap<String,HashMap<String,Namelist>> readNamelists(ConfigTreeMapState treeMapFromConfig)
+	{
+//		MaespaTreeConfiguration treeConfig = new MaespaTreeConfiguration();
+		HashMap<String,HashMap<String,Namelist>> returnValues = new HashMap<String,HashMap<String,Namelist>>();
+		String rootDirectory = treeMapFromConfig.rootDirectory;
+		treeXYMap = new int[treeMapFromConfig.width][treeMapFromConfig.length];
+		treeXYTreeMap = new int[treeMapFromConfig.width][treeMapFromConfig.length];
+		int x,y;
+        int numberOfTreePlots;
+
+        int treeFilesNumber;
+        int treeNumber;
+     
+        numberOfTreePlots = treeMapFromConfig.numberTreePlots;
+ 
+        for (int loopCount= 0;loopCount < numberOfTreePlots;loopCount++)
+        {
+                x=treeMapFromConfig.xLocation[loopCount];
+                y=treeMapFromConfig.yLocation[loopCount];
+                treeFilesNumber=treeMapFromConfig.treesfileNumber[loopCount];
+                treeNumber=treeMapFromConfig.trees[loopCount];
+                treeXYMap[x][y]=treeFilesNumber  ;
+                treeXYTreeMap[x][y]=treeNumber;
+          
+                for (int diffShadingType =1;diffShadingType < 3;diffShadingType++)
+                {
+                	HashMap<String,Namelist> maespaNamelists= returnValues.get(treeFilesNumber+"_"+diffShadingType);
+                	if (maespaNamelists == null)
+                	{
+                		maespaNamelists = readMaespaNamelistFiles(treeFilesNumber, diffShadingType, rootDirectory);
+                	}
+                	returnValues.put(treeFilesNumber+"_"+diffShadingType, maespaNamelists);
+                }     
+        }
+        return returnValues;
+	}
 	
 	public HashMap<String,HashMap<String,Namelist>> readNamelists(MaespaConfigTreeMapState treeMapFromConfig)
 	{
@@ -383,11 +460,39 @@ public class OverallConfiguration
 			String[] splitKey = key.split("_");		
 	        treeConfigLocation=splitKey[0]      ; 
 	        treeConfigLocationStr=treeConfigLocation+"";
-        	MaespaDataFile data = readMaespaTestflxDataFiles(rootDirectory + treeConfigLocationStr + "/" + splitKey[1]  , rootDirectory);
+	        MaespaDataFile data = readMaespaTestflxDataFiles(rootDirectory + treeConfigLocationStr + "/" + splitKey[1]  , rootDirectory);
         	testflxResults.put(key, data);
 		}
 		return testflxResults;
 	}
+	
+	public HashMap<String,VegetationDataFile> readVegetationTestflxData(HashMap<String,ArrayList<VegetationDataResults>> maespaResults)
+	{
+		HashMap<String,VegetationDataFile> testflxResults = new HashMap<String,VegetationDataFile>();		
+        String treeConfigLocation;
+        String treeConfigLocationStr;      
+		
+		Set<String> keys = maespaResults.keySet();
+		for (String key : keys)
+		{
+			String[] splitKey = key.split("_");		
+	        treeConfigLocation=splitKey[0]      ; 
+	        treeConfigLocationStr=treeConfigLocation+"";
+	        VegetationDataFile data = readVegetationTestflxDataFiles(rootDirectory + treeConfigLocationStr + "/" + splitKey[1]  , rootDirectory);
+        	testflxResults.put(key, data);
+		}
+		return testflxResults;
+	}
+	
+    public VegetationDataFile readVegetationTestflxDataFiles(String testflxLocation, String rootDirectory)
+    {
+	     int linesToSkip;
+	     String testflxfilestr;  
+	     testflxfilestr = testflxLocation + "/testflx.dat"; 
+	     linesToSkip = 21; 
+	     VegetationDataFile data = new VegetationDataFile(testflxfilestr, linesToSkip);
+	     return data;
+    }
 	
     public MaespaDataFile readMaespaTestflxDataFiles(String testflxLocation, String rootDirectory)
     {
@@ -487,6 +592,183 @@ public class OverallConfiguration
         }
 //        System.out.println(returnValues.toString());
         return returnValues;
+	}
+	
+	public ConfigTreeMapState readTreeMapFromConfig(String rootDirectory)
+	{
+		ConfigTreeMapState state = new ConfigTreeMapState();
+	    int numberTreePlots;
+	    int numberBuildingPlots;
+	    int width,length;
+	    int[] xLocation, yLocation;
+	    int[] xBuildingLocation, yBuildingLocation;
+	    int[] phyfileNumber,strfileNumber,treesfileNumber, treesHeight,trees;
+	    int[] buildingsHeight;
+	    
+	    int configTreeMapCentralArrayLength;
+	    int configTreeMapCentralWidth;
+	    int configTreeMapCentralLength;
+	    int configTreeMapX;
+	    int configTreeMapY;
+	    int configTreeMapX1;
+	    int configTreeMapX2;
+	    int configTreeMapY1;
+	    int configTreeMapY2;
+	    int configTreeMapNumsfcab;
+	    double configTreeMapGridSize;
+	    int configTreeMapHighestBuildingHeight;
+	    
+	    state.rootDirectory = rootDirectory;
+	    String treemapfilename = rootDirectory
+	    		+ "treemap.dat";
+	    Namelist treemapNamelist = new Namelist(treemapfilename);	    
+	    
+	    numberTreePlots = treemapNamelist.getIntValue("count", "numberTreePlots");
+	    state.numberTreePlots=numberTreePlots;
+	    	    
+	    numberBuildingPlots = treemapNamelist.getIntValue("buildingcount", "numberBuildingPlots");
+	    state.numberBuildingPlots=numberBuildingPlots;
+	     
+	    xBuildingLocation = new int[numberBuildingPlots];
+	    yBuildingLocation = new int[numberBuildingPlots];
+	    buildingsHeight = new int[numberBuildingPlots];  
+
+	    try
+	    {
+	    	 xLocation = treemapNamelist.getIntArrayValue("location", "xLocation");
+	    }
+	    catch(Exception e)
+	    {
+	    	xLocation = new int[0];
+	    }
+	    state.xLocation=xLocation;
+	    
+	    try
+	    {
+	    	yLocation = treemapNamelist.getIntArrayValue("location", "yLocation");
+	    }
+	    catch(Exception e)
+	    {
+	    	yLocation = new int[0];
+	    }	    
+	    state.yLocation=yLocation;
+	    
+	    try
+	    {
+	    	 phyfileNumber = treemapNamelist.getIntArrayValue("location", "phyfileNumber");
+	    	 System.out.println("phyfileNumber size=" + phyfileNumber.length);
+	    }
+	    catch(Exception e)
+	    {
+	    	phyfileNumber = new int[0];
+	    }	   
+	    state.phyfileNumber=phyfileNumber;
+	    try
+	    {
+	    	 strfileNumber = treemapNamelist.getIntArrayValue("location", "strfileNumber");
+	    	 System.out.println("strfileNumber size=" + strfileNumber.length);
+	    }
+	    catch(Exception e)
+	    {
+	    	strfileNumber = new int[0];
+	    }		   
+	    state.strfileNumber=strfileNumber;
+	    try
+	    {
+	    	  treesfileNumber = treemapNamelist.getIntArrayValue("location", "treesfileNumber");
+	    	  System.out.println("treesfileNumber size=" + treesfileNumber.length);
+	    }
+	    catch(Exception e)
+	    {
+	    	treesfileNumber = new int[0];
+	    }		  
+	    state.treesfileNumber=treesfileNumber;
+	    try
+	    {
+	    	treesHeight = treemapNamelist.getIntArrayValue("location", "treesHeight");
+	    	System.out.println("treesHeight size=" + treesHeight.length);
+	    }
+	    catch(Exception e)
+	    {
+	    	treesHeight = new int[0];
+	    }	
+	    
+	    state.treesHeight=treesHeight;
+	    try
+	    {
+	    	trees = treemapNamelist.getIntArrayValue("location", "trees");
+	    	System.out.println("trees size=" + trees.length);
+	    }
+	    catch(Exception e)
+	    {
+	    	trees = new int[0];
+	    }
+	    state.trees=trees;	      
+
+	    try
+	    {
+	    	 xBuildingLocation = treemapNamelist.getIntArrayValue("buildinglocation", "xBuildingLocation");
+	    }
+	    catch(Exception e)
+	    {
+	    	xBuildingLocation = new int[0];
+	    }
+	    state.xBuildingLocation=xBuildingLocation;
+	    try
+	    {
+	    	yBuildingLocation = treemapNamelist.getIntArrayValue("buildinglocation", "yBuildingLocation");
+	    }
+	    catch(Exception e)
+	    {
+	    	yBuildingLocation = new int[0];
+	    }	    
+	    state.yBuildingLocation=yBuildingLocation;
+	    try
+	    {
+	    	buildingsHeight = treemapNamelist.getIntArrayValue("buildinglocation", "buildingsHeight");
+	    }
+	    catch(Exception e)
+	    {
+	    	buildingsHeight = new int[0];
+	    }		    
+	    state.buildingsHeight=buildingsHeight   ; 
+
+	    width = treemapNamelist.getIntValue("domain", "width");
+	    state.width=width;
+	    length = treemapNamelist.getIntValue("domain", "length");
+	    state.length=length ;
+	    configTreeMapCentralArrayLength = treemapNamelist.getIntValue("domain", "configTreeMapCentralArrayLength");
+	    state.configTreeMapCentralArrayLength=configTreeMapCentralArrayLength;
+	    configTreeMapCentralWidth = treemapNamelist.getIntValue("domain", "configTreeMapCentralWidth");
+	    state.configTreeMapCentralWidth=configTreeMapCentralWidth;
+	    configTreeMapCentralLength = treemapNamelist.getIntValue("domain", "configTreeMapCentralLength");
+	    state.configTreeMapCentralLength=configTreeMapCentralLength;
+	    configTreeMapX = treemapNamelist.getIntValue("domain", "configTreeMapX");
+	    state.configTreeMapX=configTreeMapX;
+	    configTreeMapY = treemapNamelist.getIntValue("domain", "configTreeMapY");
+	    state.configTreeMapY=configTreeMapY;
+	    configTreeMapX1 = treemapNamelist.getIntValue("domain", "configTreeMapX1");
+	    state.configTreeMapX1=configTreeMapX1;
+	    configTreeMapX2 = treemapNamelist.getIntValue("domain", "configTreeMapX2");
+	    state.configTreeMapX2=configTreeMapX2;
+	    configTreeMapY1 = treemapNamelist.getIntValue("domain", "configTreeMapY1");
+	    state.configTreeMapY1=configTreeMapY1;
+	    configTreeMapY2 = treemapNamelist.getIntValue("domain", "configTreeMapY2");
+	    state.configTreeMapY2=configTreeMapY2;
+	    configTreeMapGridSize = treemapNamelist.getDoubleValue("domain", "configTreeMapGridSize");
+	    state.configTreeMapGridSize=configTreeMapGridSize;
+	    configTreeMapNumsfcab = treemapNamelist.getIntValue("domain", "configTreeMapNumsfcab");
+	    state.configTreeMapNumsfcab=configTreeMapNumsfcab;
+	    configTreeMapHighestBuildingHeight = treemapNamelist.getIntValue("domain", "configTreeMapHighestBuildingHeight");
+	    state.configTreeMapHighestBuildingHeight=configTreeMapHighestBuildingHeight;
+ 
+	    state.configPartitioningMethod=treemapNamelist.getIntValue("runSwitches", "partitioningMethod");
+	    state.usingDiffShading=treemapNamelist.getIntValue("runSwitches", "usingDiffShading");
+	    
+	    System.out.println(state.toString());
+	    
+//	    end subroutine readMaespaTreeMapFromConfig
+	    return state;
 	}
 	
 
@@ -783,6 +1065,14 @@ public class OverallConfiguration
 		common.appendFile(text, filename);
 	}
 	
+    public static double getTransmissionForVegetation(int treeLocation, HashMap<String,VegetationDataFile> maespaTestflxData  )
+    {
+      //This is 1 because TD in Maespa is always the same throughout the day
+      VegetationDataFile data = maespaTestflxData.get(treeLocation + "_1");
+      double[] tdData = data.getDataArrayForVariable("TD");
+      return tdData[0];
+    }
+		
     public static double getTransmissionForTree(int treeLocation, HashMap<String,MaespaDataFile> maespaTestflxData  )
     {
       //This is 1 because TD in Maespa is always the same throughout the day
@@ -790,6 +1080,22 @@ public class OverallConfiguration
       double[] tdData = data.getDataArrayForVariable("TD");
       return tdData[0];
     }
+    
+    public static int getBuildingHeightFromConfig(int x, int y, ConfigTreeMapState treeState)
+	   {
+    	//if the tree location isn't found, then it will be 0 high
+    	int buildingHeight = 0 ;
+	    //first check if the x,y is in the location list
+	    for (int loopCount = 0;loopCount < treeState.numberBuildingPlots;loopCount++)
+		{
+	        if ( (x-1)==treeState.xBuildingLocation[loopCount] && (y-1)==treeState.yBuildingLocation[loopCount] ) 
+	        {
+	            buildingHeight = treeState.buildingsHeight[loopCount];
+	        }
+		}
+	    return buildingHeight;
+	   
+	   }
     
     public static int getBuildingHeightFromConfig(int x, int y, MaespaConfigTreeMapState treeState)
 	   {

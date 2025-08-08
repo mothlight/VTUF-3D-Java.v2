@@ -2,7 +2,7 @@ package VTUF3D;
 
 import java.util.HashMap;
 
-import VTUF3D.Utilities.MaespaDataFile;
+import VTUF3D.Utilities.VegetationDataFile;
 
 public class Shade
 {
@@ -13,7 +13,7 @@ public class Shade
 			boolean[][][] surf_shade, int AL2, int AW2, int BH, int PAR, double[][] sfc, int numsfc, int a1, int a2,
 			int b1, int b2, int numsfc2, double[][] sfc_ab, int par_ab, boolean[][][] veg_shade, double timeis,
 			int yd_actual, double[][] treeXYMapSunlightPercentageTotal, int[][] treeXYMap,
-			HashMap<String, MaespaDataFile> maespaTestflxData)
+			HashMap<String, VegetationDataFile> vegetationTestflxData)
 	{
 		HashMap<String,double[][]> returnValues = new HashMap<String,double[][]>();
 		
@@ -265,7 +265,7 @@ public class Shade
 									//TODO figure out how to replace TestflxData, variable TD (total transission) with online Maespa
 									transmissionPercentage = ReverseRay.reverseRayTrace(XT, XINC, YT, YINC, ZT, ZINC,
 											XTEST, YTEST, ZTEST, BH, AL2, AW2, veg_shade, timeis, yd_actual, treeXYMap,
-											maespaTestflxData);
+											vegetationTestflxData);
 									sfc[i][Constants.sfc_sunlight_fact] = sfc[i][Constants.sfc_sunlight_fact] + transmissionPercentage;
 									vegetationInRay = false;
 								}

@@ -32,7 +32,7 @@ public class EnergyBalances
 	// double leFromEt5
 	// double simpelQe
 	public HashMap energyBalanceForVegetation(int[][] treeXYMap, int[] sfc_ab_map_x, int[] sfc_ab_map_y, int iabCount, double timeis, int diffShadingValueUsed,
-			double[] Tsfc, HashMap<String, ArrayList<MaespaDataResults>> maespaDataArray, int[][] treeXYTreeMap, double leFromEt5, double simpelQe,
+			double[] Tsfc, HashMap<String, ArrayList<VegetationDataResults>> vegetationDataArray, int[][] treeXYTreeMap, double leFromEt5, double simpelQe,
 			double[][] sfc, double[][] sfc_ab, int iIndex10, double patchlen, double zH, double Rnet, double httc, double Tconv,
 			 double[] currentRnet, double[] currentQh, double[] currentQe, double[] currentQg, double Rnet_tot, double Qh_tot, double Qe_tot, double Qg_tot,
 			 int sixPlusThreeTimesNumlayers, double[] lambda_sfc)
@@ -50,7 +50,7 @@ public class EnergyBalances
 
 			//TODO figure out how to replace this with online Maespa
 			String key = treeXYMap[sfc_ab_map_x[iabCount]-1][sfc_ab_map_y[iabCount]-1] + "_" + diffShadingValueUsed;
-			Tsfc[iabCount] = maespaDataArray.get(key).get(tempTimeis-1).getTCAN() + 273.15;
+			Tsfc[iabCount] = vegetationDataArray.get(key).get(tempTimeis-1).getTCAN() + 273.15;
 			if (Double.isNaN(Tsfc[iabCount]))
 			{
 				System.out.println();
@@ -59,7 +59,7 @@ public class EnergyBalances
 			if (treeXYTreeMap[sfc_ab_map_x[iabCount]-1][sfc_ab_map_y[iabCount]-1] > 0) 
 			{
 				//TODO figure out how to replace this with online Maespa
-				leFromEt5 = maespaDataArray.get(key).get(tempTimeis-1).getQeCalc5() ;
+				leFromEt5 = vegetationDataArray.get(key).get(tempTimeis-1).getQeCalc5() ;
 				System.out.println("le=" + leFromEt5 + " " + simpelQe);
 			}
 		}
@@ -2614,7 +2614,7 @@ System.out.println("++++++++++++++++++++++++start vfcalc=" + (System.currentTime
 	//return surf_shade, veg_shade, surf, numsfc, numsfc_ab
 	public HashMap convertHeightsToShading(int bh, int aw2, int al2, int al, int aw, int a1, int a2, int b1, int b2, int bl, int bw,
 			int[][] bldht, int[][] veght, boolean [][][] surf_shade, boolean [][][] veg_shade,
-			boolean [][][][] surf, MaespaConfigTreeMapState treeMapFromConfig)
+			boolean [][][][] surf, ConfigTreeMapState treeMapFromConfig)
 	{
 		HashMap convertHeightsReturn = new HashMap();
 
@@ -2798,7 +2798,7 @@ System.out.println("++++++++++++++++++++++++start vfcalc=" + (System.currentTime
 	
 	//return bldhti, veghti, maxbh, numroof, bldht_tot
 	public HashMap createDomainBarrayCube(int al, int aw, int bw, int bl, int sw, int sw2, int bh, int[][] treeXYMap,
-			HashMap<String, HashMap<String, Namelist>> namelists, MaespaConfigTreeMapState treeMapFromConfig,
+			HashMap<String, HashMap<String, Namelist>> namelists, ConfigTreeMapState treeMapFromConfig,
 			double patchlen, double zref, double zH)
 	{
 		HashMap createDomainBarrayCubeReturnValues = new HashMap();
@@ -2860,7 +2860,7 @@ System.out.println("++++++++++++++++++++++++start vfcalc=" + (System.currentTime
 		return createDomainBarrayCubeReturnValues;
 	}
 	
-	public int[] matchGrids(int a1, int a2, int b1, int b2, int bh, int aw2, int al2, boolean[][][][] surf, MaespaConfigTreeMapState treeMapFromConfig,
+	public int[] matchGrids(int a1, int a2, int b1, int b2, int bh, int aw2, int al2, boolean[][][][] surf, ConfigTreeMapState treeMapFromConfig,
 			double[][] sfc_ab, int numsfc2, boolean found, int iIndex, int numsfc)
 	{
 		int[] ind_ab = new int[numsfc];

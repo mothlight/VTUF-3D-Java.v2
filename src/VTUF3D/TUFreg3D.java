@@ -47,7 +47,7 @@ package VTUF3D;
 import java.util.ArrayList;
 import java.util.HashMap;
 
-import VTUF3D.Utilities.MaespaDataFile;
+import VTUF3D.Utilities.VegetationDataFile;
 import VTUF3D.Utilities.Namelist;
 
 public class TUFreg3D
@@ -56,9 +56,7 @@ public class TUFreg3D
 	// and number the output with the new values
 	protected static boolean restartedRun = false;
 	protected static int restartedRunStartTimestep = 0;
-//	protected static int restartedRunNumber = 0;
 	
-//	VTUF3DUtil util = new VTUF3DUtil();
 	private String[] args;
 	
 	public static long startTime = System.currentTimeMillis();
@@ -95,7 +93,7 @@ public class TUFreg3D
 
 	public void run()
 	{		
-		MaespaConfigTreeMapState treeMapFromConfig; 
+		ConfigTreeMapState treeMapFromConfig; 
 
 		int DIFFERENTIALSHADINGDIFFUSE;
 
@@ -121,7 +119,13 @@ public class TUFreg3D
         	System.exit(1);
         }
 		OverallConfiguration overall = new OverallConfiguration(rootDirectory);
-		treeMapFromConfig = overall.readMaespaTreeMapFromConfig(rootDirectory);
+		treeMapFromConfig = overall.readTreeMapFromConfig(rootDirectory);
+		
+		System.out.println(treeMapFromConfig.toString());
+		System.out.println(rootDirectory);
+
+		
+		
 		treeMapFromConfig.rootDirectory = rootDirectory;
 		DIFFERENTIALSHADINGDIFFUSE = treeMapFromConfig.usingDiffShading;
 
@@ -130,12 +134,13 @@ public class TUFreg3D
 			System.out.println("DIFFERENTIALSHADING100PERCENT");
 		}
 
-		HashMap<String, ArrayList<MaespaDataResults>> maespaDataArray = overall.mapTrees(treeMapFromConfig);
+		HashMap<String, ArrayList<VegetationDataResults>> maespaDataArray = overall.mapTrees(treeMapFromConfig);
 		int[][] treeXYMap = overall.getTreeXYMap();
 		int[][] treeXYTreeMap = overall.getTreeXYTreeMap();
+		System.exit(1);
 
 		//TODO replace these with online versions
-		HashMap<String, MaespaDataFile> maespaTestflxData = overall.readMaespaTestflxData(maespaDataArray);
+		HashMap<String, VegetationDataFile> vegetationTestflxData = overall.readVegetationTestflxData(maespaDataArray);
 		HashMap<String, HashMap<String, Namelist>> namelists = overall.readNamelists(treeMapFromConfig);
 
 		double[][] treeXYMapSunlightPercentageTotal = new double[treeMapFromConfig.width][treeMapFromConfig.length];
@@ -205,7 +210,7 @@ public class TUFreg3D
 		VTUF3DLoop loop = new VTUF3DLoop();
 		loop.loop(numlp, numbhbl, vfcalc, lpin, treeMapFromConfig, overall, namelists, treeXYMap,
 				treeXYTreeMap, xlat_in, xlatmax, stror_in, strormax, facet_out, bh_o_bl, 
-				yd, outpt_tm, Ldn_fact, treeXYMapSunlightPercentageTotal, maespaTestflxData, DIFFERENTIALSHADINGDIFFUSE, maespaDataArray,
+				yd, outpt_tm, Ldn_fact, treeXYMapSunlightPercentageTotal, vegetationTestflxData, DIFFERENTIALSHADINGDIFFUSE, maespaDataArray,
 				Tthreshold, sum_out, matlab_out, writeTsfc, writeKl, writeKabs, writeKrefl, writeLabs, writeLrefl, writeLdown,  writeTmrt, writeUtci, 
 				writeEnergyBalances,  strorint,  xlatint,  year, restartedRunStartTimestep, rootDirectory, parameters);
 
